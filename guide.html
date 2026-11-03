@@ -1,0 +1,321 @@
+<title>claude-kit</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout : colonne de lecture 980px, terminal en pièce maîtresse, sections en grille qui passe à 1 colonne sur mobile */
+:root {
+  --bg: #f6f6fa; --surface: #ffffff; --fg: #1d1b2e; --muted: #5d5a75; --line: #e2e0ee;
+  --accent: #6d4fd8; --accent-soft: #ece7fd;
+  --term-bg: #17152a; --term-fg: #d9d6ee; --term-dim: #7d7899;
+  --t-violet: #a78bfa; --t-blue: #60a5fa; --t-pink: #f472b6; --t-green: #4ade80; --t-yellow: #facc15; --t-orange: #fb923c; --t-red: #f87171; --t-cyan: #22d3ee; --t-grey: #94a3b8;
+  --deny: #c0352b; --deny-soft: #fdecea; --ask: #a35c00; --ask-soft: #fff3df; --ok: #1f7a46; --ok-soft: #e4f5ea;
+  --f-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --f-body: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #100f1c; --surface: #19172b; --fg: #ebe9f7; --muted: #a29fbd; --line: #2c2944;
+  --accent: #b39dff; --accent-soft: #2a2350; --term-bg: #0a0914;
+  --deny: #ff8a80; --deny-soft: #3a1a1a; --ask: #ffc266; --ask-soft: #3a2a10; --ok: #6fdc9a; --ok-soft: #12301f; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #100f1c; --surface: #19172b; --fg: #ebe9f7; --muted: #a29fbd; --line: #2c2944;
+  --accent: #b39dff; --accent-soft: #2a2350; --term-bg: #0a0914;
+  --deny: #ff8a80; --deny-soft: #3a1a1a; --ask: #ffc266; --ask-soft: #3a2a10; --ok: #6fdc9a; --ok-soft: #12301f; color-scheme: dark }
+
+* { box-sizing: border-box }
+body { background: var(--bg); color: var(--fg); font: 15px/1.6 var(--f-body); }
+.wrap { max-width: 980px; margin: 0 auto; padding-block: 40px 80px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 64px }
+h1, h2, h3 { font-family: var(--f-display); text-wrap: balance; margin: 0; line-height: 1.15 }
+h1 { font-size: clamp(2.4rem, 6vw, 3.6rem); font-weight: 700; letter-spacing: -0.02em }
+h2 { font-size: 1.6rem; font-weight: 700 }
+h3 { font-size: 1.05rem; font-weight: 600; font-family: var(--f-body) }
+p { margin: 0 }
+code, kbd, .mono { font-family: var(--f-mono); font-size: .88em }
+code { background: var(--accent-soft); color: var(--accent); padding: 1px 6px; border-radius: 4px }
+.eyebrow { font: 600 .72rem/1 var(--f-mono); text-transform: uppercase; letter-spacing: .12em; color: var(--accent) }
+.lead { color: var(--muted); font-size: 1.08rem; max-width: 62ch }
+section { display: grid; gap: 20px; min-width: 0 }
+.sec-head { display: grid; gap: 8px }
+
+/* Hero */
+.hero { display: grid; gap: 18px }
+.hero h1 span { color: var(--accent) }
+.install { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; background: var(--term-bg); color: var(--term-fg); border-radius: 10px; padding: 14px 16px; font: 14px var(--f-mono); max-width: 100% }
+.install .cmd { flex: 1 1 260px; min-width: 0; overflow-x: auto; white-space: nowrap }
+.install .cmd::before { content: "❯ "; color: var(--t-violet) }
+button.copy { font: 600 12px var(--f-body); background: transparent; color: var(--term-fg); border: 1px solid #3b3760; border-radius: 6px; padding: 6px 12px; cursor: pointer }
+button.copy:hover { border-color: var(--t-violet); color: #fff }
+button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
+.chips { display: flex; flex-wrap: wrap; gap: 8px }
+.chip { font: 500 13px var(--f-body); padding: 4px 10px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); background: var(--surface) }
+
+/* Terminal */
+.term { background: var(--term-bg); color: var(--term-fg); border-radius: 12px; overflow: hidden; box-shadow: 0 20px 50px -24px rgba(40, 20, 120, .45) }
+.term-bar { display: flex; gap: 7px; padding: 12px 14px; border-bottom: 1px solid #262340 }
+.term-bar i { width: 11px; height: 11px; border-radius: 50%; background: #3a3658 }
+.term-body { padding: 18px 18px 20px; font: 13.5px/1.75 var(--f-mono); overflow-x: auto; white-space: pre }
+.term-body .prompt { color: var(--term-dim) }
+.c-violet{color:var(--t-violet);font-weight:600}.c-blue{color:var(--t-blue)}.c-pink{color:var(--t-pink)}.c-green{color:var(--t-green)}.c-yellow{color:var(--t-yellow)}.c-orange{color:var(--t-orange)}.c-red{color:var(--t-red)}.c-cyan{color:var(--t-cyan)}.c-grey{color:var(--t-grey)}.c-dim{color:var(--term-dim)}
+.seg { border-radius: 3px; transition: background .15s }
+.seg.hl { background: rgba(167, 139, 250, .22); outline: 1px solid rgba(167, 139, 250, .5) }
+
+.legend { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px }
+.legend button { all: unset; cursor: pointer; display: grid; gap: 2px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface) }
+.legend button:hover, .legend button.on { border-color: var(--accent) }
+.legend button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
+.legend b { font: 600 13px var(--f-mono); color: var(--fg) }
+.legend span { font-size: 13px; color: var(--muted) }
+.gauge { display: flex; height: 8px; border-radius: 4px; overflow: hidden; max-width: 420px }
+.gauge i { flex: 1 }
+.gauge-labels { display: flex; justify-content: space-between; max-width: 420px; font: 12px var(--f-mono); color: var(--muted); font-variant-numeric: tabular-nums }
+
+/* Skills */
+.skills { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 10px; overflow: hidden }
+.skill { background: var(--surface); padding: 16px; display: grid; gap: 6px; align-content: start; min-width: 0 }
+.skill .name { font: 600 15px var(--f-mono); color: var(--accent) }
+.skill .name em { font-style: normal; color: var(--muted); font-weight: 400 }
+.skill p { color: var(--muted); font-size: 14px }
+.skill .ex { font: 12.5px var(--f-mono); color: var(--fg); opacity: .8; overflow-wrap: anywhere }
+
+/* Guard */
+.guard { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px }
+.gcol { border: 1px solid var(--line); border-radius: 10px; background: var(--surface); overflow: hidden; min-width: 0 }
+.gcol h3 { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--line) }
+.pill { font: 600 11px var(--f-mono); text-transform: uppercase; letter-spacing: .08em; padding: 3px 8px; border-radius: 999px }
+.p-deny { background: var(--deny-soft); color: var(--deny) } .p-ask { background: var(--ask-soft); color: var(--ask) } .p-ok { background: var(--ok-soft); color: var(--ok) }
+.gcol ul { list-style: none; margin: 0; padding: 8px 14px 14px; display: grid; gap: 6px }
+.gcol li { font-size: 13.5px; color: var(--muted) }
+.gcol li code { background: none; padding: 0; color: var(--fg) }
+
+/* Tables */
+.cols2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 28px }
+.tbl { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--surface) }
+table { border-collapse: collapse; width: 100%; font-size: 14px }
+th, td { text-align: left; padding: 9px 14px; border-bottom: 1px solid var(--line); vertical-align: top }
+tr:last-child td { border-bottom: 0 }
+th { font: 600 11px var(--f-mono); text-transform: uppercase; letter-spacing: .1em; color: var(--muted) }
+kbd { display: inline-block; background: var(--bg); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; padding: 0 6px; color: var(--fg); white-space: nowrap }
+td:first-child { white-space: nowrap }
+
+.agents { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px }
+.agent { padding: 14px; border-left: 3px solid var(--accent); background: var(--surface); border-radius: 0 8px 8px 0; display: grid; gap: 4px }
+.agent b { font: 600 14px var(--f-mono) }
+.agent span { font-size: 13.5px; color: var(--muted) }
+.agent small { font: 11px var(--f-mono); color: var(--accent); text-transform: uppercase; letter-spacing: .08em }
+
+pre.code { margin: 0; background: var(--term-bg); color: var(--term-fg); padding: 16px; border-radius: 10px; font: 13px/1.6 var(--f-mono); overflow-x: auto }
+.k { color: var(--t-violet) } .s { color: var(--t-green) } .n { color: var(--t-orange) } .cm { color: var(--term-dim) }
+footer { color: var(--muted); font-size: 13px; border-top: 1px solid var(--line); padding-top: 20px }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important } }
+</style>
+
+<div class="wrap">
+
+<header class="hero">
+  <div class="eyebrow">Personnalisation Claude Code · v1</div>
+  <h1>claude-<span>kit</span></h1>
+  <p class="lead">Une statusline qui te dit tout, des garde-fous contre les commandes destructrices, des notifications quand Claude a fini, et 11 commandes en français. Zéro dépendance, Node 18+ suffit.</p>
+  <div class="install">
+    <div class="cmd" id="install-cmd">git clone https://github.com/mathys-chn/claude-kit.git &amp;&amp; cd claude-kit &amp;&amp; node install.js</div>
+    <button class="copy" type="button" id="copy-install" data-target="install-cmd">Copier</button>
+  </div>
+  <div class="chips">
+    <span class="chip">macOS · Linux · Windows/WSL</span>
+    <span class="chip">Sauvegarde auto de ta config</span>
+    <span class="chip">Relançable sans doublon</span>
+    <span class="chip"><code>--uninstall</code> pour tout retirer</span>
+  </div>
+</header>
+
+<section>
+  <div class="sec-head">
+    <div class="eyebrow">Statusline</div>
+    <h2>Deux lignes, tout l'essentiel</h2>
+    <p class="lead">Dans le terminal, c'est la statusline. Dans l'app de bureau et VS Code, les mêmes infos s'affichent en pastilles au-dessus du prompt (bande <code>kit-band</code>), avec un bouton <code>/compact</code> quand le contexte dépasse 80 %, le budget mensuel et la durée du dernier tour. Survole un élément de la légende pour le repérer.</p>
+  </div>
+  <div class="term" aria-label="Aperçu de la statusline">
+    <div class="term-bar"><i></i><i></i><i></i></div>
+<div class="term-body"><span class="prompt">❯ /plan ajouter l'export PDF des factures</span>
+
+<span class="seg" data-k="model"><span class="c-violet">◆ Opus 5.5</span></span><span class="c-dim"> │ </span><span class="seg" data-k="dir"><span class="c-blue">▸ ~/dev/mch-app</span></span><span class="c-dim"> │ </span><span class="seg" data-k="git"><span class="c-pink">⎇ feat/export-pdf</span> <span class="c-green">●2</span> <span class="c-yellow">✚3</span> <span class="c-grey">?1</span> <span class="c-cyan">↑2</span></span><span class="c-dim"> │ </span><span class="seg" data-k="lines"><span class="c-green">+312</span> <span class="c-red">-48</span></span><span class="c-dim"> │ </span><span class="seg" data-k="style"><span class="c-dim">✎ Mentor</span></span>
+<span class="seg" data-k="ctx"><span class="c-dim">◔</span> <span class="c-yellow">██████▏</span><span class="c-dim">░░░</span> <span class="c-yellow">61%</span> <span class="c-dim">122k/200k</span></span><span class="c-dim"> │ </span><span class="seg" data-k="cost"><span class="c-green">$1.84</span><span class="c-dim"> ($2.28/h)</span></span><span class="c-dim"> │ </span><span class="seg" data-k="time"><span class="c-dim">⏱</span> 48m<span class="c-dim"> · api 45%</span></span><span class="c-dim"> │ </span><span class="seg" data-k="limit"><span class="c-dim">⚡</span> 5h <span class="c-green">██▌</span><span class="c-dim">░░░</span> <span class="c-green">42%</span> <span class="c-dim">↻2h04</span><span class="c-dim"> · </span>7j <span class="c-green">18%</span></span><span class="c-dim"> │ </span><span class="seg" data-k="clock"><span class="c-dim">◷ 19:36</span></span></div>
+  </div>
+
+  <div class="legend" id="legend">
+    <button type="button" data-k="model"><b>◆ Modèle</b><span>Le modèle qui répond en ce moment</span></button>
+    <button type="button" data-k="dir"><b>▸ Dossier</b><span>Répertoire courant, raccourci</span></button>
+    <button type="button" data-k="git"><b>⎇ Git</b><span>● indexés · ✚ modifiés · ? non suivis · ≡ stash · ↑ à pousser · ↓ à tirer · ✖ conflits · ✓ propre</span></button>
+    <button type="button" data-k="lines"><b>+ − Lignes</b><span>Lignes ajoutées / supprimées par Claude dans la session</span></button>
+    <button type="button" data-k="style"><b>✎ Style</b><span>Style de sortie actif (masqué si « default »)</span></button>
+    <button type="button" data-k="ctx"><b>◔ Contexte</b><span>Remplissage de la fenêtre. À 85 % : alerte <code>/compact</code></span></button>
+    <button type="button" data-k="cost"><b>$ Coût</b><span>Coût de la session et rythme horaire. Jaune à 50 % du budget, rouge au-delà</span></button>
+    <button type="button" data-k="time"><b>⏱ Durée</b><span>Temps de session et part passée à attendre l'API</span></button>
+    <button type="button" data-k="limit"><b>⚡ Limites</b><span>Quotas 5 h et 7 jours de ton abonnement, avec le temps avant reset</span></button>
+    <button type="button" data-k="clock"><b>◷ Heure</b><span>Pour savoir depuis quand tu bosses</span></button>
+  </div>
+
+  <div style="display:grid;gap:6px">
+    <div class="gauge" aria-hidden="true"><i style="flex:50;background:var(--t-green)"></i><i style="flex:20;background:var(--t-yellow)"></i><i style="flex:15;background:var(--t-orange)"></i><i style="flex:15;background:var(--t-red)"></i></div>
+    <div class="gauge-labels"><span>0 %</span><span>50</span><span>70</span><span>85</span><span>100 %</span></div>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head">
+    <div class="eyebrow">Skills</div>
+    <h2>11 commandes prêtes à l'emploi</h2>
+    <p class="lead">Tape <code>/</code> dans Claude Code pour les voir. Claude les déclenche aussi tout seul quand ta demande correspond.</p>
+  </div>
+  <div class="skills">
+    <div class="skill"><div class="name">/plan <em>&lt;tâche&gt;</em></div><p>Méthode APEX : analyser, planifier, attendre ton feu vert, exécuter, vérifier.</p><div class="ex">/plan ajouter Stripe au checkout</div></div>
+    <div class="skill"><div class="name">/fix <em>&lt;erreur&gt;</em></div><p>Reproduit, trouve la cause racine, corrige au plus petit endroit et prouve que c'est réglé.</p><div class="ex">/fix TypeError: cannot read 'id'</div></div>
+    <div class="skill"><div class="name">/review <em>[cible]</em></div><p>Revue par un agent dédié, classée bloquant / important / suggestion, avec scénario qui casse.</p><div class="ex">/review feat/export-pdf</div></div>
+    <div class="skill"><div class="name">/test <em>&lt;cible&gt;</em></div><p>Écrit des tests dans le style du projet et les fait passer. Signale les bugs trouvés.</p><div class="ex">/test src/lib/invoice.ts</div></div>
+    <div class="skill"><div class="name">/refactor <em>&lt;cible&gt;</em></div><p>Nettoie par petites étapes, tests relancés à chaque fois, comportement identique.</p><div class="ex">/refactor app/api/orders</div></div>
+    <div class="skill"><div class="name">/explain <em>&lt;sujet&gt;</em></div><p>Du général au détail, avec schéma si plusieurs composants interagissent.</p><div class="ex">/explain le flux d'authentification</div></div>
+    <div class="skill"><div class="name">/commit</div><p>Indexe fichier par fichier (jamais les secrets), message Conventional Commits au style du repo.</p><div class="ex">/commit</div></div>
+    <div class="skill"><div class="name">/pr <em>[base]</em></div><p>Branche, push, PR avec Pourquoi / Quoi / Comment tester / Points d'attention.</p><div class="ex">/pr develop</div></div>
+    <div class="skill"><div class="name">/standup <em>[période]</em></div><p>Ton travail résumé en langage humain : fait, en cours, prochaines étapes.</p><div class="ex">/standup semaine</div></div>
+    <div class="skill"><div class="name">/onboard</div><p>Fait le tour d'un repo inconnu et écrit un CLAUDE.md court et utile.</p><div class="ex">/onboard</div></div>
+    <div class="skill"><div class="name">/cheat</div><p>Affiche l'aide-mémoire directement dans le terminal.</p><div class="ex">/cheat</div></div>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head">
+    <div class="eyebrow">Hook guard</div>
+    <h2>Les garde-fous</h2>
+    <p class="lead">Avant chaque commande ou accès fichier, guard décide. Tout est noté dans <code>~/.claude/claude-kit/security.log</code>.</p>
+  </div>
+  <div class="guard">
+    <div class="gcol"><h3><span class="pill p-deny">Bloqué</span> jamais exécuté</h3><ul>
+      <li><code>rm -rf /</code>, <code>rm -rf ~</code>, <code>--no-preserve-root</code></li>
+      <li><code>curl … | sh</code> (script distant)</li>
+      <li><code>git push --force</code> sur main / master / prod</li>
+      <li><code>mkfs</code>, <code>dd of=/dev/…</code>, fork bomb</li>
+      <li><code>DROP DATABASE</code>, <code>chmod 777 /</code>, shutdown</li>
+    </ul></div>
+    <div class="gcol"><h3><span class="pill p-ask">Confirmation</span> Claude te demande</h3><ul>
+      <li><code>sudo</code>, <code>rm -r</code>, <code>kill -9</code></li>
+      <li><code>git reset --hard</code>, <code>clean -f</code>, <code>branch -D</code></li>
+      <li><code>DELETE</code> sans <code>WHERE</code>, <code>DROP TABLE</code>, reset de BDD</li>
+      <li><code>npm publish</code></li>
+      <li>Fichiers <code>.env</code>, clés SSH, <code>.pem</code>, credentials</li>
+    </ul></div>
+    <div class="gcol"><h3><span class="pill p-ok">Automatique</span> les autres hooks</h3><ul>
+      <li><b>format</b> : Biome, Prettier, Ruff, gofmt ou rustfmt après chaque modif</li>
+      <li><b>notify</b> : notif système quand une tâche de plus de 20 s se termine ou attend ton accord</li>
+      <li><b>session-start</b> : Claude démarre en connaissant ta branche et tes derniers commits</li>
+    </ul></div>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head">
+    <div class="eyebrow">Agents &amp; styles</div>
+    <h2>Des spécialistes à appeler</h2>
+    <p class="lead">Claude délègue tout seul, ou demande-le : « utilise l'agent explorer pour trouver où on gère les paiements ».</p>
+  </div>
+  <div class="agents">
+    <div class="agent"><small>Haiku · lecture seule</small><b>explorer</b><span>Cartographie le code vite et pas cher.</span></div>
+    <div class="agent"><small>lecture seule</small><b>code-reviewer</b><span>Bugs, sécurité, perf, avec preuves.</span></div>
+    <div class="agent"><small>peut éditer</small><b>debugger</b><span>Hypothèses, preuves, cause racine.</span></div>
+    <div class="agent"><small>peut éditer</small><b>test-writer</b><span>Tests qui attrapent de vrais bugs.</span></div>
+    <div class="agent"><small>/output-style</small><b>Mentor</b><span>Explique le pourquoi, laisse des TODO(toi).</span></div>
+    <div class="agent"><small>/output-style</small><b>Express</b><span>Code d'abord, zéro blabla.</span></div>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head">
+    <div class="eyebrow">Aide-mémoire</div>
+    <h2>Raccourcis Claude Code</h2>
+  </div>
+  <div class="cols2">
+    <div class="tbl"><table>
+      <thead><tr><th>Touche</th><th>Action</th></tr></thead>
+      <tbody>
+        <tr><td><kbd>Shift</kbd>+<kbd>Tab</kbd></td><td>Change de mode : normal, auto-accept, plan</td></tr>
+        <tr><td><kbd>Esc</kbd></td><td>Interrompt Claude</td></tr>
+        <tr><td><kbd>Esc</kbd> <kbd>Esc</kbd></td><td>Revient à un message précédent</td></tr>
+        <tr><td><kbd>Ctrl</kbd>+<kbd>R</kbd></td><td>Recherche dans l'historique</td></tr>
+        <tr><td><kbd>Ctrl</kbd>+<kbd>O</kbd></td><td>Affiche le détail du transcript</td></tr>
+        <tr><td><kbd>@</kbd>fichier</td><td>Ajoute un fichier au contexte</td></tr>
+        <tr><td><kbd>!</kbd>cmd</td><td>Lance une commande shell</td></tr>
+        <tr><td><kbd>#</kbd>note</td><td>Enregistre une note en mémoire</td></tr>
+      </tbody>
+    </table></div>
+    <div class="tbl"><table>
+      <thead><tr><th>Commande</th><th>Usage</th></tr></thead>
+      <tbody>
+        <tr><td><code>/compact</code></td><td>Résume la conversation pour libérer du contexte</td></tr>
+        <tr><td><code>/clear</code></td><td>Repart de zéro (nouvelle tâche)</td></tr>
+        <tr><td><code>/context</code></td><td>Détail de ce qui occupe le contexte</td></tr>
+        <tr><td><code>/model</code></td><td>Change de modèle</td></tr>
+        <tr><td><code>/cost</code></td><td>Coût et tokens de la session</td></tr>
+        <tr><td><code>/resume</code></td><td>Reprend une ancienne session</td></tr>
+        <tr><td><code>/agents</code> · <code>/hooks</code></td><td>Gère agents et hooks</td></tr>
+        <tr><td><code>/output-style</code></td><td>Passe en Mentor ou Express</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head">
+    <div class="eyebrow">Réglages</div>
+    <h2>Tout se règle avec <code>/kit</code></h2>
+    <p class="lead">Un panneau s'ouvre dans Claude. Chaque changement s'applique tout de suite et s'enregistre dans <code>~/.claude/claude-kit/config.json</code>, le fichier que lisent aussi les hooks et la statusline.</p>
+  </div>
+  <div class="tbl"><table>
+    <thead><tr><th>Onglet</th><th>Ce qu'on y règle</th></tr></thead>
+    <tbody>
+      <tr><td><code>Bande</code></td><td>Une ou deux lignes, style des puces (arrondi, carré, contour, texte), ordre et affichage de chaque élément, rythme et heure de reset</td></tr>
+      <tr><td><code>Couleurs</code></td><td>9 thèmes ou ta couleur en hex, nom affiché, devise, budget par session</td></tr>
+      <tr><td><code>Notifications</code></td><td>Fin de tâche, demande d'accord, durée minimale, son et choix du son, heures calmes</td></tr>
+      <tr><td><code>Sécurité</code></td><td>Blocage des commandes destructrices, confirmation des commandes risquées, protection des secrets, journal</td></tr>
+      <tr><td><code>Automatisations</code></td><td>Formatage par langage, résumé du dépôt en début de session, icônes de la statusline</td></tr>
+      <tr><td><code>À propos</code></td><td>Chemin du fichier de réglages, réinitialisation</td></tr>
+    </tbody>
+  </table></div>
+<pre class="code"><span class="cm"># Ouvrir directement un onglet</span>
+/kit notifications
+/kit sécurité
+
+<span class="cm"># Couper un hook pour une session, sans toucher aux réglages</span>
+CLAUDE_KIT_NOTIFY=<span class="n">0</span> claude
+CLAUDE_KIT_FORMAT=<span class="n">0</span> claude</pre>
+</section>
+
+<footer>claude-kit · inspiré d'aiblueprint, réécrit sans dépendance. Ta config d'origine est sauvegardée dans <code>~/.claude/claude-kit/backups/</code> à chaque installation.</footer>
+</div>
+
+<script>
+(function () {
+  var segs = document.querySelectorAll('.seg');
+  var btns = document.querySelectorAll('#legend button');
+  function show(k) {
+    segs.forEach(function (s) { s.classList.toggle('hl', s.dataset.k === k); });
+    btns.forEach(function (b) { b.classList.toggle('on', b.dataset.k === k); });
+  }
+  btns.forEach(function (b) {
+    b.addEventListener('mouseenter', function () { show(b.dataset.k); });
+    b.addEventListener('focus', function () { show(b.dataset.k); });
+    b.addEventListener('click', function () { show(b.dataset.k); });
+  });
+  document.getElementById('legend').addEventListener('mouseleave', function () { show(null); });
+
+  document.querySelectorAll('button.copy').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var el = document.getElementById(btn.dataset.target);
+      var text = el.textContent;
+      var done = function () { btn.textContent = 'Copié'; setTimeout(function () { btn.textContent = 'Copier'; }, 1500); };
+      try {
+        navigator.clipboard.writeText(text).then(done, function () { select(el); });
+      } catch (e) { select(el); }
+    });
+  });
+  function select(el) { var r = document.createRange(); r.selectNodeContents(el); var s = getSelection(); s.removeAllRanges(); s.addRange(r); }
+})();
+</script>
