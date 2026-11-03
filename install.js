@@ -6,6 +6,8 @@
 //   node install.js --name="Ton nom"  texte de la pastille de la bande (sinon la question est posée)
 //   node install.js --keep-aiblueprint  garde aussi la bande d'aiblueprint (sinon elle est remplacée)
 //   node install.js --streamdeck     installe aussi tout de suite le plugin Stream Deck (sinon : /kit → Stream Deck)
+//   node install.js --auto-update    active les mises à jour automatiques (--no-auto-update pour les couper)
+//   node install.js --update         mode silencieux utilisé par la mise à jour automatique
 //   node install.js --uninstall  retire claude-kit et restaure la dernière sauvegarde de settings.json
 "use strict";
 const fs = require("fs");
@@ -23,6 +25,9 @@ const argValue = (name) => {
 const ICONS = argValue("icons");
 const NAME = argValue("name");
 const WITH_STREAMDECK = args.includes("--streamdeck");
+const UPDATE = args.includes("--update");
+const AUTO_UPDATE = args.includes("--auto-update") ? "auto" : args.includes("--no-auto-update") ? "notify" : undefined;
+const VERSION = (() => { try { return fs.readFileSync(path.join(__dirname, "VERSION"), "utf8").trim(); } catch { return "0.0.0"; } })();
 
 // Dossier des plugins de l'application Stream Deck (macOS / Windows) ; null si l'app n'est pas installée
 const SD_PLUGIN = "io.github.mathyschn.claudekit.sdPlugin";
@@ -67,6 +72,25 @@ function copyDir(from, to, { overwrite = true } = {}) {
   }
 }
 const isKitHook = (h) => typeof h?.command === "string" && h.command.includes("claude-kit");
+
+// Ferme l'app Stream Deck, remplace le plugin, rouvre l'app (les fichiers sont verrouillés pendant qu'elle tourne sous Windows)
+function updateStreamDeckPlugin(from, to) {
+  const { spawnSync } = require("child_process");
+  const quiet = { stdio: "ignore", timeout: 15000 };
+  if (process.env.STREAMDECK_PLUGINS_DIR) { fs.rmSync(to, { recursive: true, force: true }); copyDir(from, to); return; } // tests
+  if (process.platform === "darwin") {
+    spawnSync("osascript", ["-e", 'quit app "Elgato Stream Deck"'], quiet);
+    spawnSync("sleep", ["2"], quiet);
+    fs.rmSync(to, { recursive: true, force: true });
+    copyDir(from, to);
+    spawnSync("open", ["-a", "Elgato Stream Deck"], quiet);
+  } else if (process.platform === "win32") {
+    spawnSync("powershell", ["-NoProfile", "-Command", "Stop-Process -Name StreamDeck -ErrorAction SilentlyContinue; Start-Sleep 2"], quiet);
+    fs.rmSync(to, { recursive: true, force: true });
+    copyDir(from, to);
+    spawnSync("powershell", ["-NoProfile", "-Command", "Start-Process 'C:\\Program Files\\Elgato\\StreamDeck\\StreamDeck.exe'"], quiet);
+  }
+}
 
 // ─────────────── Désinstallation ───────────────
 if (UNINSTALL) {
@@ -123,24 +147,31 @@ function ask(question) {
 }
 
 (async () => {
-  // Nom de la pastille : demandé une seule fois, à la première installation
+  // Questions posées une seule fois, à la première installation
   const already = readJSON(path.join(KIT, "config.json"), null);
-  if (NAME === undefined && !already?.band && process.stdin.isTTY) {
-    const answer = await ask(`  Nom à afficher dans la bande (entrée = aucun) : `);
-    install(answer);
-  } else install(undefined);
+  const interactive = process.stdin.isTTY && !UPDATE;
+  let askedName;
+  let askedUpdates;
+  if (interactive && NAME === undefined && !already?.band) {
+    askedName = await ask(`  Nom à afficher dans la bande (entrée = aucun) : `);
+  }
+  if (interactive && AUTO_UPDATE === undefined && !already?.updates?.mode) {
+    const answer = await ask(`  Mettre à jour claude-kit automatiquement depuis GitHub ? (O/n) : `);
+    askedUpdates = /^n/i.test(answer.trim()) ? "notify" : "auto";
+  }
+  install(askedName, askedUpdates);
 })();
 
-function install(askedName) {
+function install(askedName, askedUpdates) {
 
-console.log(v(`
+if (!UPDATE) console.log(v(`
    ██████╗██╗      █████╗ ██╗   ██╗██████╗ ███████╗   ██╗  ██╗██╗████████╗
   ██╔════╝██║     ██╔══██╗██║   ██║██╔══██╗██╔════╝   ██║ ██╔╝██║╚══██╔══╝
   ██║     ██║     ███████║██║   ██║██║  ██║█████╗     █████╔╝ ██║   ██║
   ██║     ██║     ██╔══██║██║   ██║██║  ██║██╔══╝     ██╔═██╗ ██║   ██║
   ╚██████╗███████╗██║  ██║╚██████╔╝██████╔╝███████╗   ██║  ██╗██║   ██║
    ╚═════╝╚══════╝╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚══════╝   ╚═╝  ╚═╝╚═╝   ╚═╝`));
-console.log(`  → ${posix(CLAUDE)}\n`);
+console.log(`  → ${posix(CLAUDE)} · version ${VERSION}\n`);
 
 // 1. Sauvegarde
 const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
@@ -165,8 +196,19 @@ const cfg = kitConfig.merge(kitConfig.DEFAULTS, existing);
 if (ICONS) cfg.statusline.icons = ICONS;
 const name = NAME !== undefined ? NAME : askedName;
 if (name !== undefined) cfg.band.brandLabel = String(name).trim().slice(0, 16);
+const updatesMode = AUTO_UPDATE || askedUpdates;
+if (updatesMode) cfg.updates.mode = updatesMode;
 writeJSON(cfgPath, cfg);
 ok(`réglages → ${posix(cfgPath)}${existing && Object.keys(existing).length ? " (tes réglages sont conservés)" : ""}`);
+
+// Version installée (comparée à celle de GitHub par hooks/update.js)
+const previousVersion = readJSON(path.join(KIT, "version.json"), {}).version;
+writeJSON(path.join(KIT, "version.json"), { version: VERSION, installedAt: new Date().toISOString(), previous: previousVersion || null });
+// On ne garde que les 15 dernières sauvegardes
+try {
+  const all = fs.readdirSync(path.join(KIT, "backups")).sort();
+  for (const old of all.slice(0, Math.max(0, all.length - 15))) fs.rmSync(path.join(KIT, "backups", old), { recursive: true, force: true });
+} catch {}
 
 // 4. Skills, agents, output styles
 const manifest = { files: [] };
@@ -216,6 +258,14 @@ if (WITH_STREAMDECK && sdDir) {
   m.streamdeck = dst;
   writeJSON(path.join(KIT, "manifest.json"), m);
   ok("plugin Stream Deck installé — redémarre l'app Stream Deck, catégorie « Claude Kit »");
+} else if (sdDir && fs.existsSync(path.join(sdDir, SD_PLUGIN))) {
+  // Plugin déjà installé : on le met à jour s'il a changé (l'app Stream Deck est relancée)
+  const installedV = readJSON(path.join(sdDir, SD_PLUGIN, "manifest.json"), {}).Version;
+  const bundledV = readJSON(path.join(SD_SRC, SD_PLUGIN, "manifest.json"), {}).Version;
+  if (installedV !== bundledV && cfg.updates.streamdeck !== false) {
+    updateStreamDeckPlugin(path.join(SD_SRC, SD_PLUGIN), path.join(sdDir, SD_PLUGIN));
+    ok(`plugin Stream Deck mis à jour (${installedV || "?"} → ${bundledV})`);
+  } else ok(`plugin Stream Deck à jour (${installedV})`);
 } else if (sdDir) {
   ok("Stream Deck détecté — installe le plugin en un clic : /kit → Stream Deck");
 } else {
@@ -241,19 +291,24 @@ if (s.statusLine && !String(s.statusLine.command || "").includes("claude-kit")) 
 }
 s.statusLine = { type: "command", command: nodeCmd("statusline/statusline.js"), padding: 0 };
 s.hooks = s.hooks || {};
-const addHook = (event, matcher, script, timeout) => {
-  s.hooks[event] = (s.hooks[event] || [])
+// On retire d'abord tous les hooks claude-kit, puis on remet ceux du plan : pas de doublon à la réinstallation
+for (const ev of Object.keys(s.hooks)) {
+  s.hooks[ev] = (s.hooks[ev] || [])
     .map((m) => ({ ...m, hooks: (m.hooks || []).filter((h) => !isKitHook(h)) }))
     .filter((m) => m.hooks.length);
-  const entry = { hooks: [{ type: "command", command: nodeCmd(script), ...(timeout ? { timeout } : {}) }] };
+  if (!s.hooks[ev].length) delete s.hooks[ev];
+}
+const addHook = (event, matcher, script, timeout) => {
+  const [file, ...rest] = script.split(" ");
+  const entry = { hooks: [{ type: "command", command: [nodeCmd(file), ...rest].join(" "), ...(timeout ? { timeout } : {}) }] };
   if (matcher) entry.matcher = matcher;
-  s.hooks[event].push(entry);
+  (s.hooks[event] = s.hooks[event] || []).push(entry);
 };
-// Un hook par événement ; ré-exécuter l'installeur remplace les anciens hooks claude-kit sans doublon
 const plan = [
   ["PreToolUse", "Bash|Read|Edit|Write|MultiEdit|NotebookEdit", "hooks/guard.js", 10],
   ["PostToolUse", "Edit|Write|MultiEdit", "hooks/format.js", 30],
   ["SessionStart", "startup|resume|clear", "hooks/session-start.js", 10],
+  ["SessionStart", "startup", "hooks/update.js --auto", 5],
   ["UserPromptSubmit", null, "hooks/prompt-stamp.js", 5],
   ["Stop", null, "hooks/notify.js", 10],
   ["Notification", null, "hooks/notify.js", 10],
@@ -284,12 +339,14 @@ if (modNames.length) {
 writeJSON(SETTINGS, s);
 ok("settings.json fusionné (statusline + hooks)");
 
+if (UPDATE) { console.log(`claude-kit ${previousVersion || "?"} → ${VERSION} installé`); return; }
 console.log(`
   ${g("Installé !")} Redémarre Claude Code (ou l'app de bureau), puis :
 
     ${v("/kit")}     réglages : bande, couleurs, notifications, sécurité, Stream Deck
     ${v("/cheat")}   aide-mémoire des commandes
 
+  Mises à jour        : ${cfg.updates.mode === "auto" ? "automatiques" : cfg.updates.mode === "notify" ? "tu seras prévenu" : "désactivées"} (/kit → À propos)
   Fichier de réglages : ${posix(cfgPath)}
   Désinstaller        : node install.js --uninstall
 `);

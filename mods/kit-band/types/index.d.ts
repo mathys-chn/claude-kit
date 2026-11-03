@@ -79,10 +79,23 @@ export type KitConfig = {
   format: { enabled: boolean; web: boolean; python: boolean; go: boolean; rust: boolean }
   sessionContext: { enabled: boolean; commits: number }
   streamdeck: { publish: boolean }
+  updates: { mode: 'auto' | 'notify' | 'off'; repo: string; branch: string; intervalHours: number; streamdeck: boolean }
   statusline: { icons: 'nerd' | 'unicode' | 'ascii'; barWidth: number; show: Record<string, boolean> }
 }
 
 export type Tab = 'band' | 'look' | 'notifications' | 'security' | 'automation' | 'streamdeck' | 'about'
+
+/** État des mises à jour (claude-kit/update.json écrit par hooks/update.js, + version.json) */
+export type UpdateState = {
+  installed: string
+  latest: string
+  state: 'up-to-date' | 'available' | 'updating' | 'installed' | 'error' | 'unknown'
+  notes: string[]
+  checkedAt: number
+  installedAt: number
+  message: string
+  busy: boolean
+}
 
 /** Ce que l'onglet Stream Deck sait de la machine */
 export type StreamDeckState = {
@@ -109,6 +122,7 @@ declare module 'claude-code' {
       tab: Tab
       hexDraft: string
       sd: StreamDeckState | null
+      update: UpdateState | null
     }
   }
 }

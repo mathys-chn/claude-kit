@@ -1,6 +1,6 @@
 {
   "name": "kit-band",
-  "version": "3.3.0",
+  "version": "3.4.0",
   "description": "Bande au-dessus du prompt et panneau de réglages de claude-kit (/kit) : limites, contexte, coût, git, couleurs, notifications, sécurité.",
   "author": {
     "name": "Mathys Chenu"

@@ -1,5 +1,13 @@
 # Changelog
 
+## 3.4.0 — 2026-11-03
+
+- **Mises à jour automatiques** : à l'ouverture de Claude (au plus toutes les 6 h), le kit vérifie GitHub en arrière-plan et installe la nouvelle version tout seul, réglages conservés. Modes Auto, Me prévenir ou Désactivé dans /kit → À propos.
+- **Notes de version** dans /kit → À propos, avec les boutons Vérifier et Mettre à jour.
+- **Pastille dans la bande** quand une version est disponible ou vient d'être installée.
+- Le plugin **Stream Deck** est mis à jour avec le kit s'il est installé.
+- L'installeur demande à la première installation si tu veux les mises à jour automatiques ; il ne garde que les 15 dernières sauvegardes.
+
 ## 3.3.1 — 2026-11-03
 
 - **Stream Deck** : les touches « Limite semaine » et « Budget mensuel » affichaient la vue d'ensemble. L'app Stream Deck renvoie les identifiants d'action en minuscules ; ils le sont désormais dans le manifeste, et le plugin les reconnaît sans tenir compte de la casse (plugin v1.0.1).

@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, RenderChildren, SessionRateLimit, SessionUsage } from 'claude-code'
 
-import type { ElementId, Git, KitConfig, Limit, Settings, StreamDeckState, Tab, Turn, Usage } from '../types'
+import type { ElementId, Git, KitConfig, Limit, Settings, StreamDeckState, Tab, Turn, UpdateState, Usage } from '../types'
 
 // ─── Thème (violet par défaut, réglable) ───
 // Couleurs sémantiques : elles restent lisibles sur les puces violet sombre
@@ -65,6 +65,7 @@ const configPathAtom = atom({ plugin: 'kit-band', key: 'configPath' } as const, 
 const tabAtom = atom({ plugin: 'kit-band', key: 'tab' } as const, 'band')
 const hexDraftAtom = atom({ plugin: 'kit-band', key: 'hexDraft' } as const, '')
 const sdAtom = atom({ plugin: 'kit-band', key: 'sd' } as const, null)
+const updateAtom = atom({ plugin: 'kit-band', key: 'update' } as const, null)
 
 const PANE_ID = 'kit-band-settings'
 const REFRESH_MS = 20_000
@@ -139,6 +140,7 @@ const DEFAULT_CONFIG: KitConfig = {
   format: { enabled: true, web: true, python: true, go: true, rust: true },
   sessionContext: { enabled: true, commits: 5 },
   streamdeck: { publish: true },
+  updates: { mode: 'notify', repo: 'mathys-chn/claude-kit', branch: 'main', intervalHours: 6, streamdeck: true },
   statusline: {
     icons: 'unicode',
     barWidth: 10,
@@ -682,6 +684,54 @@ async function openStreamDeckApp($: EngineInterface) {
   if (argv) await $.process.run(argv, { timeoutMs: 8000 }).catch(() => undefined)
 }
 
+// ─── Mises à jour (hooks/update.js fait le travail ; ici on affiche et on déclenche) ───
+let sessionStartedAt = 0
+
+const kitPath = async ($: EngineInterface, file: string) =>
+  ((await read($, configPathAtom)) || (await resolveConfigPath($))).replace(/config\.json$/, file)
+
+async function loadUpdate($: EngineInterface, patch: Partial<UpdateState> = {}) {
+  const readObj = async (file: string) => {
+    try {
+      const raw = JSON.parse(String(await $.fs.read(await kitPath($, file))))
+      return isObj(raw) ? raw : {}
+    } catch {
+      return {}
+    }
+  }
+  const [status, version] = await Promise.all([readObj('update.json'), readObj('version.json')])
+  const states = ['up-to-date', 'available', 'updating', 'installed', 'error']
+  const prev = await read($, updateAtom)
+  const next: UpdateState = {
+    installed: typeof version.version === 'string' ? version.version : '',
+    latest: typeof status.latest === 'string' ? status.latest : '',
+    state: (states.includes(String(status.state)) ? status.state : 'unknown') as UpdateState['state'],
+    notes: Array.isArray(status.notes) ? status.notes.filter((n): n is string => typeof n === 'string') : [],
+    checkedAt: typeof status.checkedAt === 'number' ? status.checkedAt : 0,
+    installedAt: typeof status.installedAt === 'number' ? status.installedAt : 0,
+    message: typeof status.message === 'string' ? status.message : '',
+    busy: prev?.busy ?? false,
+    ...patch,
+  }
+  await update($, updateAtom, () => next)
+  return next
+}
+
+// Lance hooks/update.js (--check ou --now) avec le Node de la machine
+async function runUpdater($: EngineInterface, mode: '--check' | '--now') {
+  const current = await read($, updateAtom)
+  if (current?.busy) return
+  await loadUpdate($, { busy: true, message: mode === '--now' ? 'Mise à jour en cours…' : 'Vérification…' })
+  const script = await kitPath($, 'hooks/update.js')
+  const r = await $.process.run(['node', script, mode], { timeoutMs: mode === '--now' ? 180_000 : 30_000 }).catch(() => undefined)
+  const s = await loadUpdate($, { busy: false })
+  if (!r || r.exitCode !== 0) await loadUpdate($, { busy: false, state: 'error', message: 'Impossible de lancer la mise à jour (Node introuvable ?)' })
+  else if (mode === '--now' && s.state === 'installed') $.ui.toast(`claude-kit ${s.installed} installé · redémarre Claude pour tout charger`)
+  else if (mode === '--check') $.ui.toast(s.state === 'available' ? `Version ${s.latest} disponible` : s.state === 'up-to-date' ? 'claude-kit est à jour' : s.message || 'Vérification terminée')
+}
+
+const formatAgo = (ms: number) => (ms < 60_000 ? "à l'instant" : `il y a ${formatDuration(ms)}`)
+
 async function openSettings($: EngineInterface) {
   await $.ui.open({ id: PANE_ID, title: 'claude-kit · Réglages', focus: true, closeOnEscape: true })
 }
@@ -701,8 +751,16 @@ export const register: Register = on => {
     const sharedLimits = await limitsPath($)
     let seenConfig = await mtimeOf($, configPath)
     let seenLimits = await mtimeOf($, sharedLimits)
+    const updatePath = await kitPath($, 'update.json')
+    let seenUpdate = await mtimeOf($, updatePath)
+    sessionStartedAt = await $.clock.now()
+    await loadUpdate($)
     $.clock.every(WATCH_MS, async () => {
-      const [c, l] = await Promise.all([mtimeOf($, configPath), mtimeOf($, sharedLimits)])
+      const [c, l, u] = await Promise.all([mtimeOf($, configPath), mtimeOf($, sharedLimits), mtimeOf($, updatePath)])
+      if (u !== seenUpdate) {
+        seenUpdate = u
+        await loadUpdate($)
+      }
       if (c !== seenConfig) {
         seenConfig = c
         await loadConfig($).catch(() => undefined)
@@ -718,7 +776,7 @@ export const register: Register = on => {
 
   on('command.run', { command: 'kit' }, async ($, e) => {
     const wanted = e.args.trim().toLowerCase()
-    const tabs: Record<string, Tab> = { bande: 'band', couleurs: 'look', notifications: 'notifications', notifs: 'notifications', securite: 'security', sécurité: 'security', auto: 'automation', streamdeck: 'streamdeck', stream: 'streamdeck', 'stream deck': 'streamdeck' }
+    const tabs: Record<string, Tab> = { bande: 'band', couleurs: 'look', notifications: 'notifications', notifs: 'notifications', securite: 'security', sécurité: 'security', auto: 'automation', streamdeck: 'streamdeck', stream: 'streamdeck', 'stream deck': 'streamdeck', apropos: 'about', 'à propos': 'about', maj: 'about', update: 'about', 'mise à jour': 'about' }
     if (tabs[wanted]) await update($, tabAtom, () => tabs[wanted]!)
     if (tabs[wanted] === 'streamdeck') void detectStreamDeck($)
     await openSettings($)
@@ -758,7 +816,7 @@ export const register: Register = on => {
 
   // ═════════════════════════ La bande ═════════════════════════
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
-    const [usage, turn, rawConfig] = await Promise.all([read($, usageAtom), read($, turnAtom), read($, configAtom)])
+    const [usage, turn, rawConfig, upd] = await Promise.all([read($, usageAtom), read($, turnAtom), read($, configAtom), read($, updateAtom)])
     if (e.props.hasSurvey || usage === null) return next(e)
     const kit = normalizeConfig(rawConfig)
     const st = kit.band
@@ -903,7 +961,20 @@ export const register: Register = on => {
     }
 
     const visible = st.order.filter(id => !isHidden(id))
-    const gear = <Button key="gear" label="⚙" plain dimColor onPress={() => openSettings($)} />
+    // Mise à jour : installée pendant la session (redémarrer pour charger la bande) ou disponible
+    const updateChip =
+      upd && upd.state === 'installed' && upd.installedAt > sessionStartedAt ? (
+        <Button key="upd" label={`✨ claude-kit ${upd.installed} installé · redémarre Claude`} plain onPress={async () => {
+          await update($, tabAtom, () => 'about')
+          await openSettings($)
+        }} />
+      ) : upd && upd.state === 'available' && kit.updates.mode !== 'off' ? (
+        <Button key="upd" label={`↑ claude-kit ${upd.latest} disponible`} plain onPress={async () => {
+          await update($, tabAtom, () => 'about')
+          await openSettings($)
+        }} />
+      ) : null
+    const gear = [updateChip, <Button key="gear" label="⚙" plain dimColor onPress={() => openSettings($)} />]
     const row = (key: string, ids: ElementId[], withGear: boolean) => {
       const items = ids.map(id => draw[id]()).filter(Boolean)
       if (!items.length && !withGear) return null
@@ -938,12 +1009,13 @@ export const register: Register = on => {
   ]
 
   on('ui.render', { component: 'Pane', requestId: PANE_ID }, async ($, e) => {
-    const [rawConfig, hexDraft, tab, configPath, sd] = await Promise.all([
+    const [rawConfig, hexDraft, tab, configPath, sd, upd] = await Promise.all([
       read($, configAtom),
       read($, hexDraftAtom),
       read($, tabAtom),
       read($, configPathAtom),
       read($, sdAtom),
+      read($, updateAtom),
     ])
     const kit = normalizeConfig(rawConfig)
     const st = kit.band
@@ -1002,6 +1074,7 @@ export const register: Register = on => {
             onPress={async () => {
               await update($, tabAtom, () => x.id)
               if (x.id === 'streamdeck') await detectStreamDeck($)
+              if (x.id === 'about') await loadUpdate($)
             }} />
         ))}
       </Box>
@@ -1222,6 +1295,46 @@ export const register: Register = on => {
           Link ? <Link key="repo" href={REPO_URL} label="Code source et documentation" /> : <Text key="repo">{REPO_URL}</Text>,
           <Text key="cmd" dimColor size="footnote">Ouvrir ces réglages : /kit · un onglet directement : /kit notifications, /kit sécurité, /kit streamdeck…</Text>,
         ]),
+        card('updates', 'Mises à jour', (() => {
+          const u = upd
+          const status = !u || !u.installed
+            ? 'Version inconnue : relance « node install.js »'
+            : u.busy
+              ? u.message || 'En cours…'
+              : u.state === 'available'
+                ? `Version ${u.latest} disponible`
+                : u.state === 'installed' && u.installedAt > sessionStartedAt
+                  ? `Version ${u.installed} installée · redémarre Claude pour tout charger`
+                  : u.state === 'error'
+                    ? u.message || 'Dernière vérification en échec'
+                    : 'À jour'
+          const color = !u ? t.muted : u.state === 'available' ? YELLOW : u.state === 'error' ? ORANGE : GREEN
+          return [
+            row('u-version', `claude-kit ${u?.installed || '?'}`, u?.checkedAt ? `Dernière vérification ${formatAgo(Date.now() - u.checkedAt)}` : 'Pas encore vérifié',
+              <Text key="u-dot" bold color={color}>●</Text>),
+            <Text key="u-status" color={color}>{status}</Text>,
+            ...(u && u.state === 'available' && u.notes.length
+              ? [<Text key="u-notes-t" bold>Nouveautés de la {u.latest}</Text>, ...u.notes.map((n, i) => <Text key={`u-n-${i}`} dimColor>• {n}</Text>)]
+              : []),
+            <Box key="u-actions" flexDirection="row" gap={1} flexWrap="wrap">
+              {u?.state === 'available' && (
+                <Button key="u-now" label={u.busy ? 'Mise à jour…' : `Mettre à jour vers ${u.latest}`} variant="primary" onPress={() => runUpdater($, '--now')} />
+              )}
+              <Button key="u-check" label={u?.busy ? 'Vérification…' : 'Vérifier maintenant'} dimColor onPress={() => runUpdater($, '--check')} />
+            </Box>,
+            row('u-mode', 'Mises à jour automatiques', kit.updates.mode === 'auto'
+              ? 'Installées toutes seules à l\'ouverture de Claude (réglages conservés)'
+              : kit.updates.mode === 'notify' ? 'Une pastille te prévient dans la bande' : 'Aucune vérification',
+              segmented('u-mode-s', kit.updates.mode, [
+                { value: 'auto', label: 'Auto' },
+                { value: 'notify', label: 'Me prévenir' },
+                { value: 'off', label: 'Désactivé' },
+              ], v => set(c => ({ ...c, updates: { ...c.updates, mode: v } })))),
+            row('u-sd', 'Mettre aussi à jour le Stream Deck', 'L\'app Stream Deck est relancée quelques secondes',
+              toggle('u-sd-t', kit.updates.streamdeck, v => set(c => ({ ...c, updates: { ...c.updates, streamdeck: v } }))), kit.updates.mode === 'off'),
+            <Text key="u-src" dimColor size="footnote">Source : github.com/{kit.updates.repo} ({kit.updates.branch})</Text>,
+          ]
+        })()),
         card('reset', 'Réinitialiser', [
           row('reset-band', 'Bande et couleurs', 'Ordre, style, thème et nom', <Button key="rb" label="Réinitialiser" dimColor onPress={() => set(c => ({ ...c, band: DEFAULT_CONFIG.band }))} />),
           row('reset-all', 'Tous les réglages', 'Bande, notifications, sécurité, automatisations', <Button key="ra" label="Tout réinitialiser" dimColor onPress={() => set(() => DEFAULT_CONFIG)} />),

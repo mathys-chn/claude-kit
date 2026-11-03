@@ -27,7 +27,7 @@ git clone https://github.com/mathys-chn/claude-kit.git
 | **Windows** | Double-clic sur **`Installer.cmd`** |
 | **Terminal** (tous systèmes) | `cd claude-kit && node install.js` |
 
-L'installeur te demande le nom à afficher dans la bande, puis met tout en place : bande, statusline, garde-fous, notifications, commandes, agents, et le plugin Stream Deck (prêt à être activé en un clic).
+L'installeur te demande le nom à afficher dans la bande et si tu veux les **mises à jour automatiques**, puis met tout en place : bande, statusline, garde-fous, notifications, commandes, agents, et le plugin Stream Deck (prêt à être activé en un clic).
 
 ### 3. Redémarrer Claude
 
@@ -36,11 +36,24 @@ Quitte complètement Claude Code ou l'app Claude (Cmd+Q sur Mac), rouvre-la et t
 L'installeur :
 - **sauvegarde** ton `settings.json` et ton `CLAUDE.md` dans `~/.claude/claude-kit/backups/` ;
 - **fusionne** ses réglages avec les tiens au lieu de les écraser ;
-- peut être **relancé** sans créer de doublons : pour mettre à jour, télécharge la nouvelle version et relance-le (ou `git pull && node install.js`).
+- peut être **relancé** sans créer de doublons.
+
+### Mises à jour
+
+Tu n'as rien à refaire : à l'ouverture de Claude (au plus toutes les 6 h), le kit compare sa version à celle de GitHub, en arrière-plan.
+
+| Mode (`/kit` → À propos) | Ce qui se passe |
+|---|---|
+| **Auto** | La nouvelle version est téléchargée et installée toute seule ; tes réglages, ton nom et tes sauvegardes sont conservés, et le plugin Stream Deck est mis à jour s'il est installé. Une pastille « ✨ installé · redémarre Claude » s'affiche dans la bande. |
+| **Me prévenir** | Une pastille « ↑ claude-kit x.y.z disponible » apparaît dans la bande ; un clic ouvre les notes de version et le bouton **Mettre à jour**. |
+| **Désactivé** | Aucune vérification. |
+
+À la main : `node ~/.claude/claude-kit/hooks/update.js --now`. Journal : `~/.claude/claude-kit/update.log`. Pour un fork, change `updates.repo` dans le fichier de réglages.
 
 | Option | Effet |
 |---|---|
 | `--name="Ton nom"` | Texte de la pastille de la bande, sans poser la question |
+| `--auto-update` / `--no-auto-update` | Choisit le mode des mises à jour sans poser la question |
 | `--streamdeck` | Installe tout de suite le plugin Stream Deck (sinon : `/kit` → Stream Deck) |
 | `--icons=nerd` | Icônes Nerd Font dans la statusline du terminal (`unicode` par défaut, `ascii` aussi) |
 | `--force` | Écrase les skills et agents qui portent le même nom que les tiens |
@@ -76,7 +89,7 @@ Un panneau dans Claude, avec sept onglets :
 | **Sécurité** | Blocage des commandes destructrices · confirmation des commandes risquées · protection des secrets · journal |
 | **Automatisations** | Formatage par langage · résumé du dépôt en début de session · icônes de la statusline |
 | **Stream Deck** | État de l'app et du plugin · installer, mettre à jour, désinstaller en un clic · guide pour ajouter les touches |
-| **À propos** | Chemin du fichier de réglages · réinitialisation |
+| **À propos** | Version et mises à jour (Auto, Me prévenir, Désactivé), notes de version · chemin du fichier de réglages · réinitialisation |
 
 `/kit notifications`, `/kit sécurité`… ouvre directement le bon onglet.
 
@@ -113,6 +126,7 @@ Appuyer sur une touche affiche une vue détaillée pendant 6 secondes. Le même 
 | `notify` | Notification système quand une tâche longue se termine ou que Claude attend ton accord |
 | `format` | Formate le fichier modifié avec l'outil du projet : Biome ou Prettier, Ruff, gofmt, rustfmt |
 | `session-start` | Donne à Claude la branche, les fichiers modifiés et les derniers commits dès le début |
+| `update` | Vérifie et installe les nouvelles versions du kit depuis GitHub, en arrière-plan |
 
 ### Les commandes et agents
 
@@ -147,6 +161,7 @@ Tout le kit lit un seul fichier : `~/.claude/claude-kit/config.json` (ou `$CLAUD
   "format":    { "enabled": true, "web": true, "python": true, "go": true, "rust": true },
   "sessionContext": { "enabled": true, "commits": 5 },
   "streamdeck": { "publish": true },
+  "updates":   { "mode": "auto", "repo": "mathys-chn/claude-kit", "branch": "main", "intervalHours": 6, "streamdeck": true },
   "statusline": { "icons": "unicode", "barWidth": 10, "show": { "clock": true } }
 }
 ```
@@ -161,7 +176,8 @@ claude-kit/
 ├── Installer.cmd            installation en double-clic (Windows)
 ├── install.js              installeur et désinstalleur
 ├── CLAUDE.md               préférences globales ajoutées à ton CLAUDE.md
-├── hooks/                  guard · notify · format · session-start · prompt-stamp
+├── VERSION                 version du kit (comparée à GitHub par la mise à jour automatique)
+├── hooks/                  guard · notify · format · session-start · prompt-stamp · update
 │   └── lib/config.js       valeurs par défaut et lecture du fichier de réglages
 ├── statusline/             statusline du terminal
 ├── mods/kit-band/          bande au-dessus du prompt et panneau /kit (mod Claude Code)

@@ -58,6 +58,13 @@ const DEFAULTS = {
   streamdeck: {
     publish: true, // la bande écrit l'état des sessions pour le plugin Stream Deck
   },
+  updates: {
+    mode: "notify", // "auto" (installe tout seul) | "notify" (prévient seulement) | "off"
+    repo: "mathys-chn/claude-kit", // un fork peut pointer vers son propre dépôt
+    branch: "main",
+    intervalHours: 6, // vérification au plus toutes les 6 h, à l'ouverture de Claude
+    streamdeck: true, // met aussi à jour le plugin Stream Deck s'il est installé
+  },
   statusline: {
     icons: "unicode", // "nerd" | "unicode" | "ascii"
     barWidth: 10,

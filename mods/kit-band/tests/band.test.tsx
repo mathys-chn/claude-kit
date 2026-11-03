@@ -10,6 +10,7 @@ let tick = 1
 let dirs = new Set<string>()
 let commands: string[] = []
 let onOpen: (() => void) | undefined
+let onNode: ((argv: string) => void) | undefined
 
 function engine(on: Parameters<Parameters<typeof test>[1]>[1], rateLimits: unknown[], config?: unknown, ownClock = true) {
   files = new Map(config === undefined ? [] : [[CONFIG, JSON.stringify(config)]])
@@ -52,6 +53,10 @@ function engine(on: Parameters<Parameters<typeof test>[1]>[1], rateLimits: unkno
   on('process.run', (_, e) => {
     const argv = (e as { argv: string[] }).argv.join(' ')
     commands.push(argv)
+    if (argv.startsWith('node ')) {
+      onNode?.(argv)
+      return { value: { exitCode: 0, stdout: '{}', stderr: '' } }
+    }
     if (argv === 'uname') return { value: { exitCode: 0, stdout: 'Darwin\n', stderr: '' } }
     if (argv.startsWith('open ')) {
       onOpen?.()
@@ -311,4 +316,40 @@ test('onglet Stream Deck : app absente', async ($, on) => {
   expect(await pane.find({ type: 'Text', text: /App Stream Deck non trouvée/ })).toBeTruthy()
   expect(await pane.find({ type: 'Text', text: /Elgato Stream Deck/ })).toBeTruthy()
   await pane.unmount()
+})
+
+test('mises à jour : pastille dans la bande, notes et bouton dans À propos', async ($, on) => {
+  mock.store(on)
+  const KIT = '/home/u/.claude/claude-kit'
+  engine(on, [], { band: { chip: 'pill' }, updates: { mode: 'notify' } })
+  files.set(`${KIT}/version.json`, JSON.stringify({ version: '3.4.0' }))
+  files.set(`${KIT}/update.json`, JSON.stringify({ state: 'available', current: '3.4.0', latest: '3.5.0', notes: ['Super fonction', 'Correctif'], checkedAt: now }))
+  await $.session.start({ cwd: '/repo', surface: 'desktop', isInteractive: true })
+  await new Promise(resolve => setTimeout(resolve, 80))
+
+  const band = await $.ui.mount({ ...BAND, surface: 'desktop' })
+  expect(await band.find({ type: 'Button', key: 'upd' })).toBeTruthy()
+
+  const pane = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  await pane.press({ key: 'tab-about' })
+  expect(await pane.find({ type: 'Text', text: /Version 3\.5\.0 disponible/ })).toBeTruthy()
+  expect(await pane.find({ type: 'Text', text: /Super fonction/ })).toBeTruthy()
+
+  // « Mettre à jour » lance hooks/update.js --now ; l'updater écrit ensuite update.json et version.json
+  const runs: string[] = []
+  onNode = argv => {
+    runs.push(argv)
+    files.set(`${KIT}/version.json`, JSON.stringify({ version: '3.5.0' }))
+    files.set(`${KIT}/update.json`, JSON.stringify({ state: 'installed', current: '3.5.0', latest: '3.5.0', installedAt: now + 1000, checkedAt: now }))
+  }
+  await pane.press({ key: 'u-now' })
+  onNode = undefined
+  expect(runs).toEqual([`node ${KIT}/hooks/update.js --now`])
+  expect(await pane.find({ type: 'Text', text: /3\.5\.0 installée · redémarre Claude/ })).toBeTruthy()
+
+  // choisir « Auto » l'écrit dans la config partagée
+  await pane.press({ key: 'u-mode-s-auto' })
+  expect(JSON.parse(files.get(CONFIG)!).updates.mode).toBe('auto')
+  await pane.unmount()
+  await band.unmount()
 })
