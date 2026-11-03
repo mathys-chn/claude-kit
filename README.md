@@ -1,6 +1,6 @@
 # claude-kit
 
-**Personnalisation complète de Claude Code, en français.** Une bande d'infos au-dessus du prompt, une statusline pour le terminal, des garde-fous de sécurité, des notifications, du formatage automatique, 11 commandes et 4 agents. Tout se règle depuis Claude avec `/kit`.
+**Personnalisation complète de Claude Code, en français.** Une bande d'infos au-dessus du prompt, un plugin Stream Deck, une statusline pour le terminal, des garde-fous de sécurité, des notifications, du formatage automatique, 11 commandes et 4 agents. Tout se règle depuis Claude avec `/kit`.
 
 Aucune dépendance : Node 18 ou plus suffit. macOS, Linux, Windows et WSL.
 
@@ -27,6 +27,7 @@ L'installeur :
 | `--name="Ton nom"` | Texte de la pastille de la bande, sans poser la question |
 | `--icons=nerd` | Icônes Nerd Font dans la statusline du terminal (`unicode` par défaut, `ascii` aussi) |
 | `--force` | Écrase les skills et agents qui portent le même nom que les tiens |
+| `--no-streamdeck` | N'installe pas le plugin Stream Deck même si l'app est présente |
 | `--keep-aiblueprint` | Garde aussi la bande d'[aiblueprint](https://github.com/Melvynx/aiblueprint) si tu l'avais |
 | `--uninstall` | Retire tout et remet ta configuration d'avant |
 
@@ -61,6 +62,12 @@ Un panneau dans Claude, avec six onglets :
 | **À propos** | Chemin du fichier de réglages · réinitialisation |
 
 `/kit notifications`, `/kit sécurité`… ouvre directement le bon onglet.
+
+### Le Stream Deck
+
+![Touches Stream Deck](docs/streamdeck-touches.png)
+
+Un plugin Stream Deck en français : limites 5 h / semaine / budget, contexte, coût, git, statut de Claude et vue d'ensemble, chaque touche réglable (style, couleur, valeur utilisée ou restante, seuil d'alerte, session suivie). Il fonctionne avec l'app Claude, VS Code et le terminal. L'installeur le copie si l'app Stream Deck est présente ; sinon, double-clique sur [`streamdeck/dist/claude-kit.streamDeckPlugin`](streamdeck/dist/claude-kit.streamDeckPlugin). Détails dans [streamdeck/README.md](streamdeck/README.md).
 
 ### Les hooks
 
@@ -119,6 +126,7 @@ claude-kit/
 │   └── lib/config.js       valeurs par défaut et lecture du fichier de réglages
 ├── statusline/             statusline du terminal
 ├── mods/kit-band/          bande au-dessus du prompt et panneau /kit (mod Claude Code)
+├── streamdeck/             plugin Stream Deck (+ dist/claude-kit.streamDeckPlugin)
 ├── skills/<nom>/SKILL.md   les 11 commandes
 ├── agents/                 les 4 agents
 ├── output-styles/          Mentor · Express

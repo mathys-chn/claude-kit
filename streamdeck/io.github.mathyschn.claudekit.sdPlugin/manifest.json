@@ -1,0 +1,87 @@
+{
+  "$schema": "https://schemas.elgato.com/streamdeck/plugins/manifest.json",
+  "Name": "Claude Kit",
+  "Version": "1.0.0.0",
+  "Author": "Mathys Chenu",
+  "Description": "Tes limites Claude (5 h, semaine, budget), le contexte, le coût, git et l'état de Claude sur ton Stream Deck. Fonctionne avec l'app Claude, VS Code et le terminal via claude-kit.",
+  "URL": "https://github.com/mathys-chn/claude-kit",
+  "Icon": "imgs/plugin",
+  "Category": "Claude Kit",
+  "CategoryIcon": "imgs/category",
+  "CodePath": "bin/plugin.js",
+  "PropertyInspectorPath": "ui/inspector.html",
+  "SDKVersion": 2,
+  "Software": { "MinimumVersion": "6.4" },
+  "OS": [
+    { "Platform": "mac", "MinimumVersion": "12" },
+    { "Platform": "windows", "MinimumVersion": "10" }
+  ],
+  "Nodejs": { "Version": "20", "Debug": "disabled" },
+  "UUID": "io.github.mathyschn.claudekit",
+  "Actions": [
+    {
+      "UUID": "io.github.mathyschn.claudekit.limit5h",
+      "Name": "Limite 5 h",
+      "Tooltip": "Utilisation de la fenêtre de 5 heures, rythme et heure de remise à zéro",
+      "Icon": "imgs/actions/limit5h",
+      "Controllers": ["Keypad"],
+      "States": [{ "Image": "imgs/actions/limit5h-key", "ShowTitle": false }]
+    },
+    {
+      "UUID": "io.github.mathyschn.claudekit.limitWeek",
+      "Name": "Limite semaine",
+      "Tooltip": "Utilisation hebdomadaire, % disponible par jour et jour du reset",
+      "Icon": "imgs/actions/limitWeek",
+      "Controllers": ["Keypad"],
+      "States": [{ "Image": "imgs/actions/limitWeek-key", "ShowTitle": false }]
+    },
+    {
+      "UUID": "io.github.mathyschn.claudekit.limitSpend",
+      "Name": "Budget mensuel",
+      "Tooltip": "Limite de dépenses mensuelle, si ton compte en a une",
+      "Icon": "imgs/actions/limitSpend",
+      "Controllers": ["Keypad"],
+      "States": [{ "Image": "imgs/actions/limitSpend-key", "ShowTitle": false }]
+    },
+    {
+      "UUID": "io.github.mathyschn.claudekit.context",
+      "Name": "Contexte",
+      "Tooltip": "Remplissage de la fenêtre de contexte de la session",
+      "Icon": "imgs/actions/context",
+      "Controllers": ["Keypad"],
+      "States": [{ "Image": "imgs/actions/context-key", "ShowTitle": false }]
+    },
+    {
+      "UUID": "io.github.mathyschn.claudekit.cost",
+      "Name": "Coût de session",
+      "Tooltip": "Coût, coût par heure et durée de la session",
+      "Icon": "imgs/actions/cost",
+      "Controllers": ["Keypad"],
+      "States": [{ "Image": "imgs/actions/cost-key", "ShowTitle": false }]
+    },
+    {
+      "UUID": "io.github.mathyschn.claudekit.git",
+      "Name": "Git",
+      "Tooltip": "Branche, fichiers modifiés, lignes non commitées, dernier commit",
+      "Icon": "imgs/actions/git",
+      "Controllers": ["Keypad"],
+      "States": [{ "Image": "imgs/actions/git-key", "ShowTitle": false }]
+    },
+    {
+      "UUID": "io.github.mathyschn.claudekit.status",
+      "Name": "Statut de Claude",
+      "Tooltip": "Claude réfléchit, est prêt ou inactif ; durée du dernier tour",
+      "Icon": "imgs/actions/status",
+      "Controllers": ["Keypad"],
+      "States": [{ "Image": "imgs/actions/status-key", "ShowTitle": false }]
+    },
+    {
+      "UUID": "io.github.mathyschn.claudekit.overview",
+      "Name": "Vue d'ensemble",
+      "Tooltip": "5 h, semaine et contexte sur une seule touche",
+      "Icon": "imgs/actions/overview",
+      "Controllers": ["Keypad"],
+      "States": [{ "Image": "imgs/actions/overview-key", "ShowTitle": false }]
+    }
+  ]
+}

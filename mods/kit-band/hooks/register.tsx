@@ -473,6 +473,51 @@ const readTz = ($: EngineInterface) =>
 let isRunning = false
 let isPending = false
 
+// ─── Publication de l'état de la session (lu par le plugin Stream Deck) ───
+// Un fichier par session : claude-kit/sessions/<id>.json. Le Stream Deck affiche la plus récente
+// (ou celle du projet choisi sur la touche).
+type Activity = 'working' | 'idle'
+let activity: Activity = 'idle'
+let activitySince = 0
+let lastPublished = ''
+
+async function publishSession($: EngineInterface, usage: Usage | null, force = false) {
+  if (!usage) return
+  try {
+    const [id, cwd, now, turn] = await Promise.all([$.session.id(), $.session.cwd(), $.clock.now(), read($, turnAtom)])
+    const configPath = (await read($, configPathAtom)) || (await resolveConfigPath($))
+    const path = configPath.replace(/config\.json$/, `sessions/${id}.json`)
+    const snapshot = {
+      version: 1,
+      sessionId: id,
+      project: cwd.split(/[\\/]/).filter(Boolean).pop() ?? cwd,
+      cwd,
+      model: usage.model,
+      activity,
+      activitySince,
+      cost: usage.cost,
+      elapsedMs: usage.elapsedMs,
+      turns: usage.turns,
+      context: usage.context ?? null,
+      git: usage.git,
+      lastTurn: turn,
+    }
+    const body = JSON.stringify(snapshot)
+    // évite d'écrire le même contenu en boucle ; « updatedAt » ne compte pas dans la comparaison
+    if (!force && body === lastPublished) return
+    lastPublished = body
+    await $.fs.write(path, `${JSON.stringify({ ...snapshot, updatedAt: now }, null, 2)}\n`)
+  } catch {
+    // le Stream Deck est un bonus : une erreur d'écriture ne doit jamais gêner la session
+  }
+}
+
+async function setActivity($: EngineInterface, next: Activity) {
+  activity = next
+  activitySince = await $.clock.now().catch(() => 0)
+  await publishSession($, await read($, usageAtom), true)
+}
+
 async function refresh($: EngineInterface): Promise<void> {
   if (isRunning) {
     isPending = true
@@ -499,6 +544,7 @@ async function refresh($: EngineInterface): Promise<void> {
       git,
     }
     await update($, usageAtom, () => next)
+    await publishSession($, next)
   } catch {
     // on garde la dernière bande affichée
   } finally {
@@ -562,6 +608,7 @@ export const register: Register = on => {
   on('prompt.submit', async ($, e, next) => {
     turnStartedAt = await $.clock.now().catch(() => 0)
     turnTools = 0
+    void setActivity($, 'working')
     return next(e)
   })
 
@@ -577,6 +624,7 @@ export const register: Register = on => {
     if (e.agentId === undefined && turnStartedAt) {
       const turn: Turn = { seconds: Math.round(((await $.clock.now()) - turnStartedAt) / 1000), tools: turnTools }
       await update($, turnAtom, () => turn)
+      void setActivity($, 'idle')
     }
     void refresh($)
     return completed

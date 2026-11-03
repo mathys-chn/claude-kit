@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.2.0 — 2026-11-03
+
+- **Plugin Stream Deck** (`streamdeck/`) : 8 touches en français (limite 5 h, semaine, budget, contexte, coût, git, statut de Claude, vue d'ensemble), réglables touche par touche ; fonctionne avec l'app Claude, VS Code et le terminal. Zéro dépendance.
+- La bande publie l'état de chaque session dans `claude-kit/sessions/<id>.json` (lu par le Stream Deck).
+- L'installeur copie le plugin si l'app Stream Deck est présente (`--no-streamdeck` pour l'éviter).
+
 ## 3.1.0 — 2026-11-03
 
 - **Synchronisation entre onglets** : un réglage changé dans un onglet Claude s'applique dans tous les autres en moins de 2 secondes.

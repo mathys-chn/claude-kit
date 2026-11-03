@@ -32,7 +32,8 @@ function engine(on: Parameters<Parameters<typeof test>[1]>[1], rateLimits: unkno
     on('clock.now', () => ({ value: now }))
     on('clock.every', () => ({ value: undefined }))
   }
-  on('session.cwd', () => ({ value: '/repo' }))
+  on('session.cwd', () => ({ value: '/home/u/dev/repo' }))
+  on('session.id', () => ({ value: 'sess-1' }))
   on('session.model', () => ({ value: 'claude-opus-5-5[1m]' }))
   on('session.turns', () => ({ value: 12 }))
   on('session.usage', () => ({
@@ -229,4 +230,18 @@ test('les limites reçues sont écrites dans le fichier partagé', async ($, on)
   await new Promise(resolve => setTimeout(resolve, 80))
   const shared = JSON.parse(files.get(CONFIG.replace('config.json', 'limits.json'))!)
   expect(shared.seven_day.percentUsed).toBe(93)
+})
+
+test('la session publie son état pour le Stream Deck', async ($, on) => {
+  mock.store(on)
+  engine(on, [])
+  await $.session.start({ cwd: '/repo', surface: 'desktop', isInteractive: true })
+  await new Promise(resolve => setTimeout(resolve, 80))
+  const snap = JSON.parse(files.get('/home/u/.claude/claude-kit/sessions/sess-1.json')!)
+  expect(snap.project).toBe('repo')
+  expect(snap.activity).toBe('idle')
+  expect(snap.cost).toBe(134.9)
+  expect(snap.context.percent).toBe(87)
+  expect(snap.git.branch).toBe('main')
+  expect(typeof snap.updatedAt).toBe('number')
 })

@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Claude Kit</title>
+<style>
+  :root {
+    --bg: #2d2d2d; --field: #3d3d3d; --field-hover: #454545; --line: #4a4a4a;
+    --text: #e8e8ec; --muted: #9a9aa6; --accent: #8b5cf6; --accent-soft: #3b2f5c;
+    --ok: #34d399; --warn: #fbbf24;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 10px 14px 18px; background: var(--bg); color: var(--text);
+         font: 12px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; }
+  .head { display: flex; gap: 12px; align-items: center; margin-bottom: 12px; }
+  .head img { width: 64px; height: 64px; border-radius: 10px; background: #111; flex: none; }
+  .head h1 { font-size: 13px; margin: 0 0 2px; font-weight: 700; }
+  .head p { margin: 0; color: var(--muted); }
+  .status { display: inline-flex; align-items: center; gap: 6px; margin-top: 4px; color: var(--muted); }
+  .status i { width: 7px; height: 7px; border-radius: 50%; background: var(--warn); display: inline-block; }
+  .status.ok i { background: var(--ok); }
+  section { border-top: 1px solid var(--line); padding-top: 8px; margin-top: 10px; }
+  h2 { margin: 0 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 700; }
+  .row { display: grid; grid-template-columns: 96px 1fr; align-items: center; gap: 8px; margin: 6px 0; }
+  .row > label:first-child { color: var(--muted); }
+  select, input[type=text], input[type=number] {
+    width: 100%; height: 26px; border: 0; border-radius: 4px; padding: 0 8px;
+    background: var(--field); color: var(--text); font: inherit; outline: none;
+  }
+  select:hover, input:hover { background: var(--field-hover); }
+  select:focus, input:focus { box-shadow: 0 0 0 1px var(--accent); }
+  .seg { display: flex; border-radius: 4px; overflow: hidden; background: var(--field); }
+  .seg button { flex: 1; height: 26px; border: 0; background: transparent; color: var(--muted); font: inherit; cursor: pointer; }
+  .seg button:hover { color: var(--text); }
+  .seg button[aria-pressed=true] { background: var(--accent); color: #fff; font-weight: 600; }
+  .check { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+  .check input { accent-color: var(--accent); margin: 0; }
+  .colors { display: flex; gap: 6px; align-items: center; }
+  .colors input[type=color] { width: 30px; height: 26px; border: 0; padding: 0; background: none; cursor: pointer; }
+  .hint { color: var(--muted); font-size: 11px; margin: 2px 0 0 104px; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+  <div class="head">
+    <img id="preview" alt="Aperçu de la touche">
+    <div>
+      <h1 id="title">Claude Kit</h1>
+      <p id="subtitle">Infos de Claude sur ta touche</p>
+      <div class="status" id="status"><i></i><span>Recherche des données…</span></div>
+    </div>
+  </div>
+
+  <section data-for="all">
+    <h2>Données</h2>
+    <div class="row" data-for="session">
+      <label for="project">Session</label>
+      <select id="project"><option value="">La plus récente</option></select>
+    </div>
+    <div class="row" data-for="percent">
+      <label>Valeur</label>
+      <div class="seg" data-setting="value">
+        <button type="button" data-value="used">Utilisé</button>
+        <button type="button" data-value="remaining">Restant</button>
+      </div>
+    </div>
+    <div class="row" data-for="limit">
+      <label for="showReset">Reset</label>
+      <label class="check"><input type="checkbox" id="showReset"> Afficher l'heure de remise à zéro</label>
+    </div>
+    <div class="row" data-for="percent">
+      <label for="alertAt">Alerte à</label>
+      <select id="alertAt">
+        <option value="70">70 %</option><option value="80">80 %</option><option value="85">85 %</option>
+        <option value="90">90 %</option><option value="95">95 %</option>
+      </select>
+    </div>
+    <p class="hint" data-for="percent">Au-delà, la touche passe en rouge.</p>
+  </section>
+
+  <section data-for="all">
+    <h2>Apparence</h2>
+    <div class="row" data-for="style">
+      <label>Style</label>
+      <div class="seg" data-setting="style">
+        <button type="button" data-value="ring">Anneau</button>
+        <button type="button" data-value="bar">Barre</button>
+        <button type="button" data-value="text">Texte</button>
+      </div>
+    </div>
+    <div class="row">
+      <label for="label">Libellé</label>
+      <input type="text" id="label" maxlength="14" placeholder="Par défaut">
+    </div>
+    <div class="row">
+      <label for="color">Couleur</label>
+      <div class="colors">
+        <select id="color">
+          <option value="kit">Thème de claude-kit (/kit)</option>
+          <option value="violet">Violet</option><option value="indigo">Indigo</option>
+          <option value="fuchsia">Fuchsia</option><option value="lavande">Lavande</option>
+          <option value="nuit">Bleu nuit</option><option value="rose">Rose</option>
+          <option value="emeraude">Émeraude</option><option value="ambre">Ambre</option>
+          <option value="graphite">Graphite</option><option value="custom">Personnalisée…</option>
+        </select>
+        <input type="color" id="customColor" hidden>
+      </div>
+    </div>
+    <div class="row">
+      <label>Fond</label>
+      <div class="seg" data-setting="background">
+        <button type="button" data-value="dark">Sombre</button>
+        <button type="button" data-value="black">Noir</button>
+        <button type="button" data-value="accent">Coloré</button>
+      </div>
+    </div>
+    <div class="row" data-for="money">
+      <label for="currency">Devise</label>
+      <select id="currency">
+        <option value="kit">Comme claude-kit</option><option value="USD">$ Dollar</option><option value="EUR">€ Euro</option>
+      </select>
+    </div>
+  </section>
+
+  <section data-for="all">
+    <h2>Appui sur la touche</h2>
+    <div class="row">
+      <label>Action</label>
+      <div class="seg" data-setting="press">
+        <button type="button" data-value="toggle">Détails</button>
+        <button type="button" data-value="refresh">Actualiser</button>
+      </div>
+    </div>
+    <p class="hint">« Détails » affiche la vue détaillée pendant 6 secondes.</p>
+  </section>
+
+<script>
+  // Quelles options montrer pour chaque action
+  const ACTIONS = {
+    limit5h: { title: "Limite 5 h", subtitle: "Fenêtre de 5 heures", groups: ["percent", "limit", "style"] },
+    limitWeek: { title: "Limite semaine", subtitle: "Utilisation hebdomadaire", groups: ["percent", "limit", "style"] },
+    limitSpend: { title: "Budget mensuel", subtitle: "Limite de dépenses", groups: ["percent", "limit", "style"] },
+    context: { title: "Contexte", subtitle: "Fenêtre de contexte", groups: ["session", "percent", "style"] },
+    cost: { title: "Coût de session", subtitle: "Coût, coût par heure, durée", groups: ["session", "money"] },
+    git: { title: "Git", subtitle: "État du dépôt de la session", groups: ["session"] },
+    status: { title: "Statut de Claude", subtitle: "Réfléchit, prêt ou inactif", groups: ["session"] },
+    overview: { title: "Vue d'ensemble", subtitle: "5 h, semaine et contexte", groups: ["session", "percent"] },
+  };
+  const DEFAULTS = { style: "ring", value: "used", label: "", color: "kit", customColor: "#7c3aed", background: "dark",
+    alertAt: 85, showReset: true, project: "", press: "toggle", currency: "kit" };
+
+  let ws, uuid, action, settings = { ...DEFAULTS };
+  const $ = (id) => document.getElementById(id);
+
+  function save() {
+    ws && ws.send(JSON.stringify({ event: "setSettings", context: uuid, payload: settings }));
+  }
+  function set(key, value) {
+    settings[key] = value;
+    render();
+    save();
+  }
+
+  function render() {
+    document.querySelectorAll(".seg").forEach((seg) => {
+      const key = seg.dataset.setting;
+      seg.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.value === String(settings[key]))));
+    });
+    $("project").value = settings.project;
+    $("showReset").checked = Boolean(settings.showReset);
+    $("alertAt").value = String(settings.alertAt);
+    $("label").value = settings.label;
+    $("color").value = settings.color;
+    $("customColor").value = settings.customColor;
+    $("customColor").hidden = settings.color !== "custom";
+    $("currency").value = settings.currency;
+  }
+
+  function showGroups(groups) {
+    document.querySelectorAll("[data-for]").forEach((el) => {
+      const g = el.dataset.for;
+      el.hidden = g !== "all" && !groups.includes(g);
+    });
+  }
+
+  // Liens entre champs et réglages
+  document.querySelectorAll(".seg").forEach((seg) =>
+    seg.addEventListener("click", (e) => {
+      const b = e.target.closest("button");
+      if (b) set(seg.dataset.setting, b.dataset.value);
+    }));
+  $("project").addEventListener("change", (e) => set("project", e.target.value));
+  $("showReset").addEventListener("change", (e) => set("showReset", e.target.checked));
+  $("alertAt").addEventListener("change", (e) => set("alertAt", Number(e.target.value)));
+  $("label").addEventListener("input", (e) => set("label", e.target.value.trim()));
+  $("color").addEventListener("change", (e) => set("color", e.target.value));
+  $("customColor").addEventListener("input", (e) => set("customColor", e.target.value));
+  $("currency").addEventListener("change", (e) => set("currency", e.target.value));
+
+  // Appelé par l'application Stream Deck à l'ouverture du panneau
+  window.connectElgatoStreamDeckSocket = function (port, inUUID, registerEvent, info, actionInfo) {
+    uuid = inUUID;
+    const ai = JSON.parse(actionInfo);
+    action = String(ai.action).split(".").pop();
+    settings = { ...DEFAULTS, ...(ai.payload && ai.payload.settings) };
+    const meta = ACTIONS[action] || ACTIONS.overview;
+    $("title").textContent = meta.title;
+    $("subtitle").textContent = meta.subtitle;
+    showGroups(meta.groups);
+    render();
+
+    ws = new WebSocket("ws://127.0.0.1:" + port);
+    ws.onopen = () => {
+      ws.send(JSON.stringify({ event: registerEvent, uuid }));
+      ws.send(JSON.stringify({ event: "sendToPlugin", action: ai.action, context: uuid, payload: { type: "hello" } }));
+    };
+    ws.onmessage = (evt) => {
+      const msg = JSON.parse(evt.data);
+      if (msg.event === "didReceiveSettings") {
+        settings = { ...DEFAULTS, ...msg.payload.settings };
+        render();
+      }
+      if (msg.event === "sendToPropertyInspector" && msg.payload && msg.payload.type === "state") {
+        const p = msg.payload;
+        $("preview").src = p.preview;
+        const sel = $("project");
+        const current = settings.project;
+        sel.innerHTML = '<option value="">La plus récente</option>' +
+          p.projects.map((name) => `<option>${name.replace(/[<&]/g, "")}</option>`).join("") +
+          (current && !p.projects.includes(current) ? `<option>${current.replace(/[<&]/g, "")}</option>` : "");
+        sel.value = current;
+        const st = $("status");
+        st.classList.toggle("ok", p.hasData);
+        st.querySelector("span").textContent = p.hasData
+          ? `Connecté · ${p.projects.length} session${p.projects.length > 1 ? "s" : ""}`
+          : "En attente : ouvre Claude avec claude-kit installé";
+      }
+    };
+  };
+</script>
+</body>
+</html>

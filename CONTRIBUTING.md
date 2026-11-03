@@ -9,6 +9,11 @@ Merci de ton intérêt ! Quelques repères :
   claude plugin validate mods/kit-band
   claude plugin test mods/kit-band
   ```
+- **Tester le plugin Stream Deck** (un faux Stream Deck lance le vrai plugin) :
+  ```bash
+  node --test streamdeck/test/*.test.js
+  node streamdeck/build.js   # refait streamdeck/dist/claude-kit.streamDeckPlugin
+  ```
 - **Tester l'installeur sans toucher à ta config** :
   ```bash
   CLAUDE_CONFIG_DIR=/tmp/claude-test node install.js --name=Test
