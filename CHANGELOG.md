@@ -1,5 +1,12 @@
 # Changelog
 
+## 3.3.0 — 2026-11-03
+
+- **Onglet Stream Deck dans `/kit`** : détecte l'app et le plugin, installe, met à jour ou désinstalle en un clic, avec le guide pour ajouter les touches.
+- **Installation en double-clic** : `Installer.command` (macOS) et `Installer.cmd` (Windows).
+- L'installeur dépose le plugin Stream Deck dans le kit au lieu de l'imposer ; `--streamdeck` l'installe directement.
+- Réglage « Publier pour le Stream Deck » (section `streamdeck` de `config.json`).
+
 ## 3.2.0 — 2026-11-03
 
 - **Plugin Stream Deck** (`streamdeck/`) : 8 touches en français (limite 5 h, semaine, budget, contexte, coût, git, statut de Claude, vue d'ensemble), réglables touche par touche ; fonctionne avec l'app Claude, VS Code et le terminal. Zéro dépendance.

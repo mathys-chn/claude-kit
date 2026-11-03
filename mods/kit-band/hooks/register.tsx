@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, RenderChildren, SessionRateLimit, SessionUsage } from 'claude-code'
 
-import type { ElementId, Git, KitConfig, Limit, Settings, Tab, Turn, Usage } from '../types'
+import type { ElementId, Git, KitConfig, Limit, Settings, StreamDeckState, Tab, Turn, Usage } from '../types'
 
 // ─── Thème (violet par défaut, réglable) ───
 // Couleurs sémantiques : elles restent lisibles sur les puces violet sombre
@@ -64,6 +64,7 @@ const configAtom = atom({ plugin: 'kit-band', key: 'config' } as const, null)
 const configPathAtom = atom({ plugin: 'kit-band', key: 'configPath' } as const, '')
 const tabAtom = atom({ plugin: 'kit-band', key: 'tab' } as const, 'band')
 const hexDraftAtom = atom({ plugin: 'kit-band', key: 'hexDraft' } as const, '')
+const sdAtom = atom({ plugin: 'kit-band', key: 'sd' } as const, null)
 
 const PANE_ID = 'kit-band-settings'
 const REFRESH_MS = 20_000
@@ -137,6 +138,7 @@ const DEFAULT_CONFIG: KitConfig = {
   guard: { enabled: true, blockDangerous: true, askRisky: true, protectSecrets: true, log: true },
   format: { enabled: true, web: true, python: true, go: true, rust: true },
   sessionContext: { enabled: true, commits: 5 },
+  streamdeck: { publish: true },
   statusline: {
     icons: 'unicode',
     barWidth: 10,
@@ -483,6 +485,7 @@ let lastPublished = ''
 
 async function publishSession($: EngineInterface, usage: Usage | null, force = false) {
   if (!usage) return
+  if (!normalizeConfig(await read($, configAtom)).streamdeck.publish) return
   try {
     const [id, cwd, now, turn] = await Promise.all([$.session.id(), $.session.cwd(), $.clock.now(), read($, turnAtom)])
     const configPath = (await read($, configPathAtom)) || (await resolveConfigPath($))
@@ -557,6 +560,128 @@ async function refresh($: EngineInterface): Promise<void> {
 }
 
 
+// ─── Stream Deck : détection et installation en un clic ───
+// L'installeur du kit dépose le plugin dans claude-kit/streamdeck/ ; l'onglet « Stream Deck » de /kit
+// l'ouvre avec l'app Stream Deck (qui l'installe), le met à jour ou le retire.
+const SD_PLUGIN = 'io.github.mathyschn.claudekit.sdPlugin'
+const SD_FILE = 'claude-kit.streamDeckPlugin'
+const MAC_APP = '/Applications/Elgato Stream Deck.app'
+const WIN_APP = 'C:/Program Files/Elgato/StreamDeck/StreamDeck.exe'
+
+async function readVersion($: EngineInterface, manifestPath: string) {
+  try {
+    const m = JSON.parse(String(await $.fs.read(manifestPath))) as { Version?: string }
+    return typeof m.Version === 'string' ? m.Version.replace(/\.0$/, '') : ''
+  } catch {
+    return ''
+  }
+}
+
+async function detectStreamDeck($: EngineInterface, message = ''): Promise<StreamDeckState> {
+  const configPath = (await read($, configPathAtom)) || (await resolveConfigPath($))
+  const kitDir = configPath.replace(/\/config\.json$/, '')
+  const home = ((await $.env.get('HOME')) ?? (await $.env.get('USERPROFILE')) ?? '').replace(/\\/g, '/')
+  const isWindows = (await $.env.get('OS')) === 'Windows_NT'
+  const appData = ((await $.env.get('APPDATA')) ?? '').replace(/\\/g, '/')
+  let platform: StreamDeckState['platform'] = 'other'
+  if (isWindows) platform = 'windows'
+  else {
+    const uname = await $.process.run(['uname'], { timeoutMs: 1500 }).catch(() => undefined)
+    if (uname?.stdout.trim() === 'Darwin') platform = 'mac'
+  }
+  const pluginsDir =
+    platform === 'mac' ? `${home}/Library/Application Support/com.elgato.StreamDeck/Plugins` : platform === 'windows' ? `${appData}/Elgato/StreamDeck/Plugins` : ''
+  const exists = (p: string) => (p ? $.fs.exists(p).catch(() => false) : Promise.resolve(false))
+  const bundledFile = `${kitDir}/streamdeck/${SD_FILE}`
+  const [appFound, dataFound, installed, bundled, installedVersion, bundledVersion, now] = await Promise.all([
+    exists(platform === 'mac' ? MAC_APP : platform === 'windows' ? WIN_APP : ''),
+    exists(pluginsDir),
+    exists(pluginsDir && `${pluginsDir}/${SD_PLUGIN}`),
+    exists(bundledFile),
+    pluginsDir ? readVersion($, `${pluginsDir}/${SD_PLUGIN}/manifest.json`) : Promise.resolve(''),
+    readVersion($, `${kitDir}/streamdeck/${SD_PLUGIN}/manifest.json`),
+    $.clock.now(),
+  ])
+  const state: StreamDeckState = {
+    platform,
+    appFound: appFound || dataFound,
+    pluginsDir,
+    installed,
+    installedVersion,
+    bundled,
+    bundledVersion,
+    bundledFile,
+    busy: false,
+    message,
+    checkedAt: now,
+  }
+  await update($, sdAtom, () => state)
+  return state
+}
+
+async function sdBusy($: EngineInterface, message: string) {
+  await update($, sdAtom, s => (s ? { ...s, busy: true, message } : s))
+}
+
+// Installer ou mettre à jour : on ouvre le fichier .streamDeckPlugin, l'app Stream Deck fait le reste
+async function installStreamDeck($: EngineInterface) {
+  const sd = (await read($, sdAtom)) ?? (await detectStreamDeck($))
+  if (!sd.bundled) {
+    await detectStreamDeck($, 'Plugin introuvable dans claude-kit : relance « node install.js » dans le dossier du kit.')
+    return
+  }
+  await sdBusy($, 'Ouverture de Stream Deck…')
+  const argv = sd.platform === 'mac' ? ['open', sd.bundledFile] : sd.platform === 'windows' ? ['cmd', '/c', 'start', '""', sd.bundledFile.replace(/\//g, '\\')] : null
+  if (!argv) {
+    await detectStreamDeck($, "Stream Deck n'existe que sur macOS et Windows.")
+    return
+  }
+  const r = await $.process.run(argv, { timeoutMs: 15000 }).catch(() => undefined)
+  if (!r || r.exitCode !== 0) {
+    await detectStreamDeck($, "Impossible d'ouvrir le plugin. Double-clique sur le fichier indiqué ci-dessous.")
+    return
+  }
+  // l'app Stream Deck demande confirmation puis installe : on revérifie un peu plus tard
+  await detectStreamDeck($, 'Valide l\'installation dans la fenêtre de Stream Deck.')
+  for (const wait of [4000, 6000, 10000]) {
+    await $.clock.sleep(wait)
+    const s = await detectStreamDeck($, 'Valide l\'installation dans la fenêtre de Stream Deck.')
+    if (s.installed && s.installedVersion === s.bundledVersion) {
+      await detectStreamDeck($, 'Plugin installé : ajoute les touches depuis la catégorie « Claude Kit ».')
+      $.ui.toast('Plugin Stream Deck installé')
+      return
+    }
+  }
+}
+
+async function uninstallStreamDeck($: EngineInterface) {
+  const sd = (await read($, sdAtom)) ?? (await detectStreamDeck($))
+  if (!sd.installed || !sd.pluginsDir) return
+  await sdBusy($, 'Désinstallation…')
+  const dir = `${sd.pluginsDir}/${SD_PLUGIN}`
+  // chemin vérifié : on ne supprime que le dossier du plugin claude-kit
+  if (!dir.endsWith(`/Plugins/${SD_PLUGIN}`)) return
+  if (sd.platform === 'mac') {
+    await $.process.run(['osascript', '-e', 'quit app "Elgato Stream Deck"'], { timeoutMs: 8000 }).catch(() => undefined)
+    await $.process.run(['rm', '-rf', dir], { timeoutMs: 8000 }).catch(() => undefined)
+    await $.process.run(['open', '-a', 'Elgato Stream Deck'], { timeoutMs: 8000 }).catch(() => undefined)
+  } else if (sd.platform === 'windows') {
+    const win = dir.replace(/\//g, '\\').replace(/'/g, "''")
+    await $.process
+      .run(['powershell', '-NoProfile', '-Command',
+        `Stop-Process -Name StreamDeck -ErrorAction SilentlyContinue; Start-Sleep 1; Remove-Item -Recurse -Force '${win}'; Start-Process '${WIN_APP.replace(/\//g, '\\')}'`],
+        { timeoutMs: 15000 })
+      .catch(() => undefined)
+  }
+  await detectStreamDeck($, 'Plugin retiré.')
+}
+
+async function openStreamDeckApp($: EngineInterface) {
+  const sd = (await read($, sdAtom)) ?? (await detectStreamDeck($))
+  const argv = sd.platform === 'mac' ? ['open', '-a', 'Elgato Stream Deck'] : sd.platform === 'windows' ? ['cmd', '/c', 'start', '""', WIN_APP.replace(/\//g, '\\')] : null
+  if (argv) await $.process.run(argv, { timeoutMs: 8000 }).catch(() => undefined)
+}
+
 async function openSettings($: EngineInterface) {
   await $.ui.open({ id: PANE_ID, title: 'claude-kit · Réglages', focus: true, closeOnEscape: true })
 }
@@ -593,8 +718,9 @@ export const register: Register = on => {
 
   on('command.run', { command: 'kit' }, async ($, e) => {
     const wanted = e.args.trim().toLowerCase()
-    const tabs: Record<string, Tab> = { bande: 'band', couleurs: 'look', notifications: 'notifications', notifs: 'notifications', securite: 'security', sécurité: 'security', auto: 'automation' }
+    const tabs: Record<string, Tab> = { bande: 'band', couleurs: 'look', notifications: 'notifications', notifs: 'notifications', securite: 'security', sécurité: 'security', auto: 'automation', streamdeck: 'streamdeck', stream: 'streamdeck', 'stream deck': 'streamdeck' }
     if (tabs[wanted]) await update($, tabAtom, () => tabs[wanted]!)
+    if (tabs[wanted] === 'streamdeck') void detectStreamDeck($)
     await openSettings($)
     return { text: 'Réglages de claude-kit ouverts.' }
   })
@@ -807,15 +933,17 @@ export const register: Register = on => {
     { id: 'notifications', label: 'Notifications' },
     { id: 'security', label: 'Sécurité' },
     { id: 'automation', label: 'Automatisations' },
+    { id: 'streamdeck', label: 'Stream Deck' },
     { id: 'about', label: 'À propos' },
   ]
 
   on('ui.render', { component: 'Pane', requestId: PANE_ID }, async ($, e) => {
-    const [rawConfig, hexDraft, tab, configPath] = await Promise.all([
+    const [rawConfig, hexDraft, tab, configPath, sd] = await Promise.all([
       read($, configAtom),
       read($, hexDraftAtom),
       read($, tabAtom),
       read($, configPathAtom),
+      read($, sdAtom),
     ])
     const kit = normalizeConfig(rawConfig)
     const st = kit.band
@@ -871,7 +999,10 @@ export const register: Register = on => {
       <Box key="tabs" flexDirection="row" gap={1} flexWrap="wrap">
         {TABS.map(x => (
           <Button key={`tab-${x.id}`} label={x.label} variant={x.id === tab ? 'primary' : undefined} dimColor={x.id !== tab}
-            onPress={() => update($, tabAtom, () => x.id)} />
+            onPress={async () => {
+              await update($, tabAtom, () => x.id)
+              if (x.id === 'streamdeck') await detectStreamDeck($)
+            }} />
         ))}
       </Box>
     )
@@ -1042,12 +1173,54 @@ export const register: Register = on => {
         ]),
       ],
 
+      streamdeck: () => {
+        if (!sd) return card('sd-wait', 'Stream Deck', <Text dimColor>Recherche de l'app Stream Deck…</Text>)
+        const isUpToDate = sd.installed && sd.installedVersion === sd.bundledVersion
+        const statusText = !sd.appFound
+          ? 'App Stream Deck non trouvée'
+          : sd.installed
+            ? isUpToDate ? `Plugin installé · v${sd.installedVersion}` : `Mise à jour disponible · v${sd.installedVersion} → v${sd.bundledVersion}`
+            : 'Plugin pas encore installé'
+        const statusColor = !sd.appFound ? ORANGE : sd.installed && isUpToDate ? GREEN : YELLOW
+        return [
+          card('sd-status', 'Stream Deck', [
+            row('sd-state', statusText, sd.platform === 'other' ? "Stream Deck n'existe que sur macOS et Windows" : sd.appFound ? 'Les touches suivent ce que fait Claude, dans l\'app, VS Code ou le terminal' : 'Installe l\'app gratuite « Elgato Stream Deck », puis reviens ici',
+              <Text key="dot" bold color={statusColor}>●</Text>),
+            sd.message && <Text key="sd-msg" color={t.accent2}>{sd.message}</Text>,
+            <Box key="sd-actions" flexDirection="row" gap={1} flexWrap="wrap">
+              {!sd.installed && (
+                <Button key="sd-install" label={sd.busy ? 'Installation…' : 'Installer le plugin'} variant="primary" dimColor={sd.busy || !sd.bundled}
+                  onPress={() => (sd.busy ? undefined : installStreamDeck($))} />
+              )}
+              {sd.installed && !isUpToDate && (
+                <Button key="sd-update" label={sd.busy ? 'Mise à jour…' : 'Mettre à jour'} variant="primary" onPress={() => (sd.busy ? undefined : installStreamDeck($))} />
+              )}
+              {sd.appFound && <Button key="sd-open" label="Ouvrir Stream Deck" onPress={() => openStreamDeckApp($)} />}
+              <Button key="sd-refresh" label="Vérifier" dimColor onPress={() => detectStreamDeck($)} />
+              {sd.installed && <Button key="sd-remove" label="Désinstaller" dimColor onPress={() => uninstallStreamDeck($)} />}
+            </Box>,
+          ]),
+          card('sd-howto', 'Ajouter des touches', [
+            <Text key="h1">1. Ouvre l'app Stream Deck.</Text>,
+            <Text key="h2">2. Dans la liste des actions à droite, ouvre la catégorie « Claude Kit ».</Text>,
+            <Text key="h3">3. Glisse une action sur une touche : Limite 5 h, Limite semaine, Contexte, Coût, Git, Statut, Vue d'ensemble…</Text>,
+            <Text key="h4">4. Clique sur la touche pour régler son style, sa couleur et la session suivie.</Text>,
+          ], 'Chaque touche se règle dans l\'app Stream Deck'),
+          card('sd-data', 'Données', [
+            row('sd-publish', 'Publier pour le Stream Deck', 'Chaque session écrit son état (contexte, coût, git) dans claude-kit/sessions/',
+              toggle('sd-publish-t', kit.streamdeck.publish, v => set(c => ({ ...c, streamdeck: { ...c.streamdeck, publish: v } })))),
+            row('sd-theme', 'Couleurs', 'Les touches réglées sur « Thème de claude-kit » suivent l\'onglet Couleurs', <Text key="sw" color={st.accent}>●</Text>),
+            !sd.installed && sd.bundled && row('sd-file', 'Installation manuelle', sd.bundledFile, <Text key="m" dimColor>double-clic</Text>),
+          ]),
+        ]
+      },
+
       about: () => [
         card('about', 'claude-kit', [
           <Text key="desc">Personnalisation de Claude Code : bande, statusline, garde-fous, notifications, skills et agents.</Text>,
           row('file', 'Fichier de réglages', configPath || '…', <Text key="file-ok" color={GREEN}>enregistré auto</Text>),
           Link ? <Link key="repo" href={REPO_URL} label="Code source et documentation" /> : <Text key="repo">{REPO_URL}</Text>,
-          <Text key="cmd" dimColor size="footnote">Ouvrir ces réglages : /kit · un onglet directement : /kit notifications, /kit sécurité…</Text>,
+          <Text key="cmd" dimColor size="footnote">Ouvrir ces réglages : /kit · un onglet directement : /kit notifications, /kit sécurité, /kit streamdeck…</Text>,
         ]),
         card('reset', 'Réinitialiser', [
           row('reset-band', 'Bande et couleurs', 'Ordre, style, thème et nom', <Button key="rb" label="Réinitialiser" dimColor onPress={() => set(c => ({ ...c, band: DEFAULT_CONFIG.band }))} />),

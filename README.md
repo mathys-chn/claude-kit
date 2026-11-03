@@ -8,26 +8,42 @@ Aucune dépendance : Node 18 ou plus suffit. macOS, Linux, Windows et WSL.
 
 ## Installation
 
+Il te faut [Node.js](https://nodejs.org) 18 ou plus (version LTS).
+
+### 1. Récupérer le kit
+
+**Sans Git** : sur cette page, bouton vert **Code → Download ZIP**, puis dézippe le fichier.
+**Avec Git** :
+
 ```bash
 git clone https://github.com/mathys-chn/claude-kit.git
-cd claude-kit
-node install.js
 ```
 
-Puis redémarre Claude Code (ou quitte complètement l'app de bureau et rouvre-la) et tape `/kit`.
+### 2. Installer (une seule fois, tout est intégré)
+
+| Système | Comment |
+|---|---|
+| **macOS** | Double-clic sur **`Installer.command`** (la première fois : clic droit → **Ouvrir**, macOS demande de confirmer) |
+| **Windows** | Double-clic sur **`Installer.cmd`** |
+| **Terminal** (tous systèmes) | `cd claude-kit && node install.js` |
+
+L'installeur te demande le nom à afficher dans la bande, puis met tout en place : bande, statusline, garde-fous, notifications, commandes, agents, et le plugin Stream Deck (prêt à être activé en un clic).
+
+### 3. Redémarrer Claude
+
+Quitte complètement Claude Code ou l'app Claude (Cmd+Q sur Mac), rouvre-la et tape **`/kit`** : tout se règle de là.
 
 L'installeur :
 - **sauvegarde** ton `settings.json` et ton `CLAUDE.md` dans `~/.claude/claude-kit/backups/` ;
 - **fusionne** ses réglages avec les tiens au lieu de les écraser ;
-- peut être **relancé** sans créer de doublons (c'est aussi comme ça qu'on met à jour : `git pull && node install.js`) ;
-- te demande le **nom** à afficher dans la bande (une seule fois).
+- peut être **relancé** sans créer de doublons : pour mettre à jour, télécharge la nouvelle version et relance-le (ou `git pull && node install.js`).
 
 | Option | Effet |
 |---|---|
 | `--name="Ton nom"` | Texte de la pastille de la bande, sans poser la question |
+| `--streamdeck` | Installe tout de suite le plugin Stream Deck (sinon : `/kit` → Stream Deck) |
 | `--icons=nerd` | Icônes Nerd Font dans la statusline du terminal (`unicode` par défaut, `ascii` aussi) |
 | `--force` | Écrase les skills et agents qui portent le même nom que les tiens |
-| `--no-streamdeck` | N'installe pas le plugin Stream Deck même si l'app est présente |
 | `--keep-aiblueprint` | Garde aussi la bande d'[aiblueprint](https://github.com/Melvynx/aiblueprint) si tu l'avais |
 | `--uninstall` | Retire tout et remet ta configuration d'avant |
 
@@ -50,7 +66,7 @@ Les limites ne sont connues qu'après une réponse de Claude : la bande garde le
 
 ### Les réglages : `/kit`
 
-Un panneau dans Claude, avec six onglets :
+Un panneau dans Claude, avec sept onglets :
 
 | Onglet | Réglages |
 |---|---|
@@ -59,15 +75,35 @@ Un panneau dans Claude, avec six onglets :
 | **Notifications** | Fin de tâche, demande d'accord · durée minimale · son (et son choix) · heures calmes |
 | **Sécurité** | Blocage des commandes destructrices · confirmation des commandes risquées · protection des secrets · journal |
 | **Automatisations** | Formatage par langage · résumé du dépôt en début de session · icônes de la statusline |
+| **Stream Deck** | État de l'app et du plugin · installer, mettre à jour, désinstaller en un clic · guide pour ajouter les touches |
 | **À propos** | Chemin du fichier de réglages · réinitialisation |
 
 `/kit notifications`, `/kit sécurité`… ouvre directement le bon onglet.
 
-### Le Stream Deck
+### Le Stream Deck (optionnel)
 
 ![Touches Stream Deck](docs/streamdeck-touches.png)
 
-Un plugin Stream Deck en français : limites 5 h / semaine / budget, contexte, coût, git, statut de Claude et vue d'ensemble, chaque touche réglable (style, couleur, valeur utilisée ou restante, seuil d'alerte, session suivie). Il fonctionne avec l'app Claude, VS Code et le terminal. L'installeur le copie si l'app Stream Deck est présente ; sinon, double-clique sur [`streamdeck/dist/claude-kit.streamDeckPlugin`](streamdeck/dist/claude-kit.streamDeckPlugin). Détails dans [streamdeck/README.md](streamdeck/README.md).
+Tes limites, ton contexte, ton coût, git et l'état de Claude sur les touches d'un Stream Deck. En français, réglable touche par touche, et ça fonctionne avec **l'app Claude, VS Code et le terminal**.
+
+**Activer le Stream Deck en un clic :**
+
+1. Installe l'app gratuite [Elgato Stream Deck](https://www.elgato.com/downloads) (macOS ou Windows) si ce n'est pas déjà fait.
+2. Dans Claude, tape **`/kit streamdeck`** (ou `/kit` → onglet **Stream Deck**).
+3. Clique sur **Installer le plugin**, puis valide dans la fenêtre qu'ouvre Stream Deck.
+4. Dans l'app Stream Deck, ouvre la catégorie **Claude Kit** et glisse les actions sur tes touches.
+5. Clique sur une touche pour la régler : style (anneau, barre, texte), couleur, valeur utilisée ou restante, seuil d'alerte, session suivie.
+
+| Touche | Affiche |
+|---|---|
+| Limite 5 h · Limite semaine · Budget mensuel | %, repère du temps écoulé, heure de reset ou « ⚠ vide 21:45 » |
+| Contexte | Remplissage, « ⚠ /compact » à 80 % |
+| Coût de session | Coût, coût par heure, durée |
+| Git | Branche, fichiers modifiés, lignes non commitées, dernier commit |
+| Statut de Claude | « Réfléchit… » avec chrono, « Prêt » ou « Inactif » |
+| Vue d'ensemble | 5 h, semaine et contexte sur une touche |
+
+Appuyer sur une touche affiche une vue détaillée pendant 6 secondes. Le même onglet de `/kit` sert à **mettre à jour** ou **désinstaller** le plugin. Sans passer par `/kit` : double-clic sur [`streamdeck/dist/claude-kit.streamDeckPlugin`](streamdeck/dist/claude-kit.streamDeckPlugin). Détails dans [streamdeck/README.md](streamdeck/README.md).
 
 ### Les hooks
 
@@ -110,6 +146,7 @@ Tout le kit lit un seul fichier : `~/.claude/claude-kit/config.json` (ou `$CLAUD
   "guard":     { "enabled": true, "blockDangerous": true, "askRisky": true, "protectSecrets": true, "log": true },
   "format":    { "enabled": true, "web": true, "python": true, "go": true, "rust": true },
   "sessionContext": { "enabled": true, "commits": 5 },
+  "streamdeck": { "publish": true },
   "statusline": { "icons": "unicode", "barWidth": 10, "show": { "clock": true } }
 }
 ```
@@ -120,6 +157,8 @@ Coupure ponctuelle sans toucher au fichier : `CLAUDE_KIT_NOTIFY=0` ou `CLAUDE_KI
 
 ```
 claude-kit/
+├── Installer.command        installation en double-clic (macOS)
+├── Installer.cmd            installation en double-clic (Windows)
 ├── install.js              installeur et désinstalleur
 ├── CLAUDE.md               préférences globales ajoutées à ton CLAUDE.md
 ├── hooks/                  guard · notify · format · session-start · prompt-stamp

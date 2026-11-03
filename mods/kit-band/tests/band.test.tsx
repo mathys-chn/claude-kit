@@ -7,10 +7,19 @@ const CONFIG = '/home/u/.claude/claude-kit/config.json'
 let files = new Map<string, string>()
 let mtimes = new Map<string, number>()
 let tick = 1
+let dirs = new Set<string>()
+let commands: string[] = []
+let onOpen: (() => void) | undefined
 
 function engine(on: Parameters<Parameters<typeof test>[1]>[1], rateLimits: unknown[], config?: unknown, ownClock = true) {
   files = new Map(config === undefined ? [] : [[CONFIG, JSON.stringify(config)]])
   mtimes = new Map(config === undefined ? [] : [[CONFIG, tick++]])
+  dirs = new Set()
+  commands = []
+  on('fs.exists', (_, e) => {
+    const path = (e as { path: string }).path
+    return { value: files.has(path) || dirs.has(path) }
+  })
   on('fs.stat', (_, e) => {
     const path = (e as { path: string }).path
     if (!files.has(path)) throw new Error('ENOENT')
@@ -31,6 +40,7 @@ function engine(on: Parameters<Parameters<typeof test>[1]>[1], rateLimits: unkno
   if (ownClock) {
     on('clock.now', () => ({ value: now }))
     on('clock.every', () => ({ value: undefined }))
+    on('clock.sleep', () => ({ value: undefined }))
   }
   on('session.cwd', () => ({ value: '/home/u/dev/repo' }))
   on('session.id', () => ({ value: 'sess-1' }))
@@ -41,6 +51,12 @@ function engine(on: Parameters<Parameters<typeof test>[1]>[1], rateLimits: unkno
   }))
   on('process.run', (_, e) => {
     const argv = (e as { argv: string[] }).argv.join(' ')
+    commands.push(argv)
+    if (argv === 'uname') return { value: { exitCode: 0, stdout: 'Darwin\n', stderr: '' } }
+    if (argv.startsWith('open ')) {
+      onOpen?.()
+      return { value: { exitCode: 0, stdout: '', stderr: '' } }
+    }
     if (argv.startsWith('date')) return { value: { exitCode: 0, stdout: '+0100\n', stderr: '' } }
     if (argv.includes('--shortstat')) return { value: { exitCode: 0, stdout: ' 3 files changed, 120 insertions(+), 30 deletions(-)\n', stderr: '' } }
     if (argv.includes('log')) return { value: { exitCode: 0, stdout: `${Math.floor((now - 3 * 3600_000) / 1000)}\n`, stderr: '' } }
@@ -244,4 +260,55 @@ test('la session publie son état pour le Stream Deck', async ($, on) => {
   expect(snap.context.percent).toBe(87)
   expect(snap.git.branch).toBe('main')
   expect(typeof snap.updatedAt).toBe('number')
+})
+
+test('onglet Stream Deck : détecte l\'app et installe le plugin en un clic', async ($, on) => {
+  mock.store(on)
+  engine(on, [])
+  const KIT = '/home/u/.claude/claude-kit'
+  const PLUGINS = '/home/u/Library/Application Support/com.elgato.StreamDeck/Plugins'
+  const SD = 'io.github.mathyschn.claudekit.sdPlugin'
+  // l'installeur du kit a déposé le plugin, l'app Stream Deck est installée
+  files.set(`${KIT}/streamdeck/claude-kit.streamDeckPlugin`, 'zip')
+  files.set(`${KIT}/streamdeck/${SD}/manifest.json`, JSON.stringify({ Version: '1.0.0.0' }))
+  dirs.add('/Applications/Elgato Stream Deck.app')
+  dirs.add(PLUGINS)
+  await $.session.start({ cwd: '/repo', surface: 'desktop', isInteractive: true })
+  await new Promise(resolve => setTimeout(resolve, 80))
+
+  const pane = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  await pane.press({ key: 'tab-streamdeck' })
+  expect(await pane.find({ type: 'Text', text: /Plugin pas encore installé/ })).toBeTruthy()
+
+  // l'app Stream Deck installera le plugin quand on ouvrira le fichier
+  const done = () => {
+    dirs.add(`${PLUGINS}/${SD}`)
+    files.set(`${PLUGINS}/${SD}/manifest.json`, JSON.stringify({ Version: '1.0.0.0' }))
+  }
+  const before = commands.length
+  onOpen = done
+  await pane.press({ key: 'sd-install' })
+  onOpen = undefined
+  await new Promise(resolve => setTimeout(resolve, 80))
+  expect(commands.slice(before)).toContain(`open ${KIT}/streamdeck/claude-kit.streamDeckPlugin`)
+  expect(await pane.find({ type: 'Text', text: /Plugin installé · v1\.0\.0/ })).toBeTruthy()
+  expect(await pane.find({ type: 'Button', key: 'sd-remove' })).toBeTruthy()
+
+  // une nouvelle version du kit propose la mise à jour
+  files.set(`${KIT}/streamdeck/${SD}/manifest.json`, JSON.stringify({ Version: '1.1.0.0' }))
+  await pane.press({ key: 'sd-refresh' })
+  expect(await pane.find({ type: 'Text', text: /Mise à jour disponible · v1\.0\.0 → v1\.1\.0/ })).toBeTruthy()
+  await pane.unmount()
+})
+
+test('onglet Stream Deck : app absente', async ($, on) => {
+  mock.store(on)
+  engine(on, [])
+  await $.session.start({ cwd: '/repo', surface: 'desktop', isInteractive: true })
+  await new Promise(resolve => setTimeout(resolve, 80))
+  const pane = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  await pane.press({ key: 'tab-streamdeck' })
+  expect(await pane.find({ type: 'Text', text: /App Stream Deck non trouvée/ })).toBeTruthy()
+  expect(await pane.find({ type: 'Text', text: /Elgato Stream Deck/ })).toBeTruthy()
+  await pane.unmount()
 })

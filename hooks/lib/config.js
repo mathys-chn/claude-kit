@@ -55,6 +55,9 @@ const DEFAULTS = {
     enabled: true,
     commits: 5,
   },
+  streamdeck: {
+    publish: true, // la bande écrit l'état des sessions pour le plugin Stream Deck
+  },
   statusline: {
     icons: "unicode", // "nerd" | "unicode" | "ascii"
     barWidth: 10,

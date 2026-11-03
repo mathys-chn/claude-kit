@@ -78,10 +78,26 @@ export type KitConfig = {
   guard: { enabled: boolean; blockDangerous: boolean; askRisky: boolean; protectSecrets: boolean; log: boolean }
   format: { enabled: boolean; web: boolean; python: boolean; go: boolean; rust: boolean }
   sessionContext: { enabled: boolean; commits: number }
+  streamdeck: { publish: boolean }
   statusline: { icons: 'nerd' | 'unicode' | 'ascii'; barWidth: number; show: Record<string, boolean> }
 }
 
-export type Tab = 'band' | 'look' | 'notifications' | 'security' | 'automation' | 'about'
+export type Tab = 'band' | 'look' | 'notifications' | 'security' | 'automation' | 'streamdeck' | 'about'
+
+/** Ce que l'onglet Stream Deck sait de la machine */
+export type StreamDeckState = {
+  platform: 'mac' | 'windows' | 'other'
+  appFound: boolean
+  pluginsDir: string
+  installed: boolean
+  installedVersion: string
+  bundled: boolean
+  bundledVersion: string
+  bundledFile: string
+  busy: boolean
+  message: string
+  checkedAt: number
+}
 
 declare module 'claude-code' {
   interface PluginState {
@@ -92,6 +108,7 @@ declare module 'claude-code' {
       configPath: string
       tab: Tab
       hexDraft: string
+      sd: StreamDeckState | null
     }
   }
 }

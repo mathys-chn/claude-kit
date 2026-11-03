@@ -5,7 +5,7 @@
 //   node install.js --icons=nerd choisit les icônes de la statusline (nerd | unicode | ascii)
 //   node install.js --name="Ton nom"  texte de la pastille de la bande (sinon la question est posée)
 //   node install.js --keep-aiblueprint  garde aussi la bande d'aiblueprint (sinon elle est remplacée)
-//   node install.js --no-streamdeck  n'installe pas le plugin Stream Deck même si l'app est présente
+//   node install.js --streamdeck     installe aussi tout de suite le plugin Stream Deck (sinon : /kit → Stream Deck)
 //   node install.js --uninstall  retire claude-kit et restaure la dernière sauvegarde de settings.json
 "use strict";
 const fs = require("fs");
@@ -22,7 +22,7 @@ const argValue = (name) => {
 };
 const ICONS = argValue("icons");
 const NAME = argValue("name");
-const NO_STREAMDECK = args.includes("--no-streamdeck");
+const WITH_STREAMDECK = args.includes("--streamdeck");
 
 // Dossier des plugins de l'application Stream Deck (macOS / Windows) ; null si l'app n'est pas installée
 const SD_PLUGIN = "io.github.mathyschn.claudekit.sdPlugin";
@@ -94,8 +94,9 @@ if (UNINSTALL) {
     else delete s.statusLine;
   }
   writeJSON(SETTINGS, s); ok("hooks retirés, statusline d'origine restaurée");
-  if (manifest.streamdeck && fs.existsSync(manifest.streamdeck)) {
-    fs.rmSync(manifest.streamdeck, { recursive: true, force: true });
+  const sdInstalled = manifest.streamdeck || (streamDeckPluginsDir() && path.join(streamDeckPluginsDir(), SD_PLUGIN));
+  if (sdInstalled && fs.existsSync(sdInstalled)) {
+    fs.rmSync(sdInstalled, { recursive: true, force: true });
     ok("plugin Stream Deck retiré (redémarre l'app Stream Deck)");
   }
   for (const f of manifest.files) { try { fs.rmSync(f, { recursive: true, force: true }); } catch {} }
@@ -198,18 +199,27 @@ for (const name of modNames) {
 }
 if (modNames.length) ok(`mod ${modNames.join(", ")} installé (bande au-dessus du prompt)`);
 
-// 4c. Plugin Stream Deck (si l'application Stream Deck est installée)
-const sdDir = NO_STREAMDECK ? null : streamDeckPluginsDir();
-if (sdDir) {
+// 4c. Plugin Stream Deck : déposé dans le dossier du kit, installé en un clic depuis /kit → Stream Deck
+const SD_SRC = path.join(SRC, "streamdeck");
+const SD_FILE = path.join(SD_SRC, "dist", "claude-kit.streamDeckPlugin");
+if (!fs.existsSync(SD_FILE)) require("child_process").execFileSync(process.execPath, [path.join(SD_SRC, "build.js")], { stdio: "ignore" });
+const sdKit = path.join(KIT, "streamdeck");
+fs.rmSync(sdKit, { recursive: true, force: true });
+copyDir(path.join(SD_SRC, SD_PLUGIN), path.join(sdKit, SD_PLUGIN));
+fs.copyFileSync(SD_FILE, path.join(sdKit, "claude-kit.streamDeckPlugin"));
+const sdDir = streamDeckPluginsDir();
+if (WITH_STREAMDECK && sdDir) {
   const dst = path.join(sdDir, SD_PLUGIN);
   fs.rmSync(dst, { recursive: true, force: true });
-  copyDir(path.join(SRC, "streamdeck", SD_PLUGIN), dst);
+  copyDir(path.join(SD_SRC, SD_PLUGIN), dst);
   const m = readJSON(path.join(KIT, "manifest.json"), { files: [] });
   m.streamdeck = dst;
   writeJSON(path.join(KIT, "manifest.json"), m);
   ok("plugin Stream Deck installé — redémarre l'app Stream Deck, catégorie « Claude Kit »");
-} else if (!NO_STREAMDECK) {
-  skip("Stream Deck non détecté (plugin à installer plus tard : streamdeck/dist/claude-kit.streamDeckPlugin)");
+} else if (sdDir) {
+  ok("Stream Deck détecté — installe le plugin en un clic : /kit → Stream Deck");
+} else {
+  skip("plugin Stream Deck prêt (si tu as un Stream Deck : /kit → Stream Deck)");
 }
 
 // 5. CLAUDE.md global (section délimitée, jamais d'écrasement)
@@ -277,7 +287,7 @@ ok("settings.json fusionné (statusline + hooks)");
 console.log(`
   ${g("Installé !")} Redémarre Claude Code (ou l'app de bureau), puis :
 
-    ${v("/kit")}     réglages : bande, couleurs, notifications, sécurité, automatisations
+    ${v("/kit")}     réglages : bande, couleurs, notifications, sécurité, Stream Deck
     ${v("/cheat")}   aide-mémoire des commandes
 
   Fichier de réglages : ${posix(cfgPath)}

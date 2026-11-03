@@ -6,9 +6,12 @@ Tes infos Claude sur les touches de ton Stream Deck, en français et personnalis
 
 ## Installation
 
-1. Installe claude-kit (`node install.js` à la racine du dépôt). Si l'app Stream Deck est installée, le plugin est copié automatiquement.
-2. Sinon : double-clique sur [`dist/claude-kit.streamDeckPlugin`](dist/claude-kit.streamDeckPlugin).
-3. Redémarre l'app Stream Deck : les actions sont dans la catégorie **Claude Kit**.
+1. Installe claude-kit (double-clic sur `Installer.command` / `Installer.cmd`, ou `node install.js`).
+2. Installe l'app gratuite [Elgato Stream Deck](https://www.elgato.com/downloads) si besoin.
+3. Dans Claude : **`/kit streamdeck`** → **Installer le plugin**, puis valide dans Stream Deck.
+4. Les actions sont dans la catégorie **Claude Kit** de l'app Stream Deck.
+
+Autres façons : `node install.js --streamdeck`, ou double-clic sur [`dist/claude-kit.streamDeckPlugin`](dist/claude-kit.streamDeckPlugin).
 
 macOS 12+ et Windows 10+, application Stream Deck 6.4 ou plus récente.
 
