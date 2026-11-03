@@ -1,7 +1,7 @@
 {
   "$schema": "https://schemas.elgato.com/streamdeck/plugins/manifest.json",
   "Name": "Claude Kit",
-  "Version": "1.0.0.0",
+  "Version": "1.0.1.0",
   "Author": "Mathys Chenu",
   "Description": "Tes limites Claude (5 h, semaine, budget), le contexte, le coût, git et l'état de Claude sur ton Stream Deck. Fonctionne avec l'app Claude, VS Code et le terminal via claude-kit.",
   "URL": "https://github.com/mathys-chn/claude-kit",
@@ -28,7 +28,7 @@
       "States": [{ "Image": "imgs/actions/limit5h-key", "ShowTitle": false }]
     },
     {
-      "UUID": "io.github.mathyschn.claudekit.limitWeek",
+      "UUID": "io.github.mathyschn.claudekit.limitweek",
       "Name": "Limite semaine",
       "Tooltip": "Utilisation hebdomadaire, % disponible par jour et jour du reset",
       "Icon": "imgs/actions/limitWeek",
@@ -36,7 +36,7 @@
       "States": [{ "Image": "imgs/actions/limitWeek-key", "ShowTitle": false }]
     },
     {
-      "UUID": "io.github.mathyschn.claudekit.limitSpend",
+      "UUID": "io.github.mathyschn.claudekit.limitspend",
       "Name": "Budget mensuel",
       "Tooltip": "Limite de dépenses mensuelle, si ton compte en a une",
       "Icon": "imgs/actions/limitSpend",

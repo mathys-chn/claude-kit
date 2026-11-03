@@ -332,13 +332,18 @@ const ACTIONS = {
   overview: overviewKey,
 };
 
+// Stream Deck n'accepte que des identifiants en minuscules (« limitweek ») :
+// on retrouve l'action sans tenir compte de la casse.
+const ACTION_BY_LOWER = Object.fromEntries(Object.keys(ACTIONS).map((k) => [k.toLowerCase(), k]));
+const resolveAction = (uuid) => ACTION_BY_LOWER[String(uuid).split(".").pop().toLowerCase()] || "overview";
+
 function renderKey(action, snap, settings, alt = false, frameIndex = 0) {
   const s = { ...DEFAULT_SETTINGS, ...(settings || {}) };
   s.alertAt = Number(s.alertAt) || 85;
-  const draw = ACTIONS[action] || overviewKey;
+  const draw = ACTIONS[resolveAction(action)];
   return draw(snap, s, alt, frameIndex);
 }
 
 const toDataUrl = (svg) => `data:image/svg+xml;charset=utf8,${encodeURIComponent(svg)}`;
 
-module.exports = { renderKey, toDataUrl, DEFAULT_SETTINGS, PRESETS, ACTIONS };
+module.exports = { renderKey, resolveAction, toDataUrl, DEFAULT_SETTINGS, PRESETS, ACTIONS };

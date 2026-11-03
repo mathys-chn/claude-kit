@@ -3,7 +3,7 @@
 "use strict";
 const { WebSocketClient } = require("./ws");
 const { snapshot, fingerprint, kitDir } = require("./data");
-const { renderKey, toDataUrl, DEFAULT_SETTINGS } = require("./render");
+const { renderKey, resolveAction, toDataUrl, DEFAULT_SETTINGS } = require("./render");
 
 // L'application Stream Deck lance le plugin avec : -port N -pluginUUID X -registerEvent Y -info JSON
 function parseArgs(argv) {
@@ -21,7 +21,6 @@ let tick = 0;
 
 const send = (event, context, payload) => ws.send(JSON.stringify({ event, context, ...(payload !== undefined && { payload }) }));
 const log = (message) => ws.send(JSON.stringify({ event: "logMessage", payload: { message: `[claude-kit] ${message}` } }));
-const shortAction = (uuid) => String(uuid).split(".").pop();
 
 function draw(context, force = false) {
   const key = keys.get(context);
@@ -65,7 +64,7 @@ ws.on("message", (raw) => {
   const { event, context, action, payload = {} } = msg;
   switch (event) {
     case "willAppear":
-      keys.set(context, { action: shortAction(action), settings: { ...DEFAULT_SETTINGS, ...(payload.settings || {}) }, alt: false, lastImage: "" });
+      keys.set(context, { action: resolveAction(action), settings: { ...DEFAULT_SETTINGS, ...(payload.settings || {}) }, alt: false, lastImage: "" });
       send("setTitle", context, { title: "", target: 0 });
       draw(context, true);
       break;

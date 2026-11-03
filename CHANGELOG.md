@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.3.1 — 2026-11-03
+
+- **Stream Deck** : les touches « Limite semaine » et « Budget mensuel » affichaient la vue d'ensemble. L'app Stream Deck renvoie les identifiants d'action en minuscules ; ils le sont désormais dans le manifeste, et le plugin les reconnaît sans tenir compte de la casse (plugin v1.0.1).
+
 ## 3.3.0 — 2026-11-03
 
 - **Onglet Stream Deck dans `/kit`** : détecte l'app et le plugin, installe, met à jour ou désinstalle en un clic, avec le guide pour ajouter les touches.

@@ -203,7 +203,9 @@
     const ai = JSON.parse(actionInfo);
     action = String(ai.action).split(".").pop();
     settings = { ...DEFAULTS, ...(ai.payload && ai.payload.settings) };
-    const meta = ACTIONS[action] || ACTIONS.overview;
+    // Stream Deck renvoie l'identifiant en minuscules (« limitweek ») : comparaison sans la casse
+    const key = Object.keys(ACTIONS).find((k) => k.toLowerCase() === action.toLowerCase()) || "overview";
+    const meta = ACTIONS[key];
     $("title").textContent = meta.title;
     $("subtitle").textContent = meta.subtitle;
     showGroups(meta.groups);

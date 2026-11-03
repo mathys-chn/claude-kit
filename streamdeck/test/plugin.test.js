@@ -13,7 +13,7 @@ const { spawn } = require("child_process");
 const PLUGIN = path.join(__dirname, "..", "io.github.mathyschn.claudekit.sdPlugin");
 const { encodeFrame, decodeFrames } = require(path.join(PLUGIN, "bin", "ws.js"));
 const { toLimit, WEEK_MS } = require(path.join(PLUGIN, "bin", "data.js"));
-const { renderKey } = require(path.join(PLUGIN, "bin", "render.js"));
+const { renderKey, resolveAction } = require(path.join(PLUGIN, "bin", "render.js"));
 
 // ─── Données d'exemple, comme les écrit la bande kit-band ───
 function fixture() {
@@ -120,6 +120,12 @@ test("le plugin s'enregistre, dessine les touches et réagit aux réglages et à
     assert.match(img, /#059669/, "la couleur vient du thème /kit");
     assert.ok(sd.received.some((m) => m.event === "setTitle" && m.context === "K1" && m.payload.title === ""));
 
+    // touche Limite semaine, identifiant en minuscules comme l'envoie l'app : pas la vue d'ensemble
+    sd.send({ event: "willAppear", action: "io.github.mathyschn.claudekit.limitweek", context: "K3", payload: { settings: {} } });
+    const week = svgOf(await sd.waitFor((m) => m.event === "setImage" && m.context === "K3"));
+    assert.match(week, /SEMAINE/);
+    assert.doesNotMatch(week, />ctx</);
+
     // touche Contexte : prend la session la plus récente (site-vitrine, 82 %) et propose /compact
     sd.send({ event: "willAppear", action: "io.github.mathyschn.claudekit.context", context: "K2", payload: { settings: {} } });
     const ctx = svgOf(await sd.waitFor((m) => m.event === "setImage" && m.context === "K2"));
@@ -152,6 +158,19 @@ test("le plugin s'enregistre, dessine les touches et réagit aux réglages et à
   } finally {
     child.kill();
     sd.close();
+  }
+});
+
+test("actions reconnues quelle que soit la casse (Stream Deck renvoie « limitweek »)", () => {
+  assert.strictEqual(resolveAction("io.github.mathyschn.claudekit.limitweek"), "limitWeek");
+  assert.strictEqual(resolveAction("io.github.mathyschn.claudekit.limitWeek"), "limitWeek");
+  assert.strictEqual(resolveAction("io.github.mathyschn.claudekit.limitspend"), "limitSpend");
+  assert.strictEqual(resolveAction("io.github.mathyschn.claudekit.inconnue"), "overview");
+  // chaque action du manifeste correspond à une touche, et ses UUID sont en minuscules comme l'exige Stream Deck
+  const manifest = JSON.parse(fs.readFileSync(path.join(PLUGIN, "manifest.json"), "utf8"));
+  for (const a of manifest.Actions) {
+    assert.strictEqual(a.UUID, a.UUID.toLowerCase(), a.UUID);
+    assert.notStrictEqual(resolveAction(a.UUID) === "overview" && !a.UUID.endsWith(".overview"), true, a.UUID);
   }
 });
 
